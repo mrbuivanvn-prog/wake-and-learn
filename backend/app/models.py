@@ -15,6 +15,9 @@ class User(Base):
     cards = relationship("Card", back_populates="user", cascade="all, delete-orphan")
     study_sessions = relationship("StudySession", back_populates="user", cascade="all, delete-orphan")
 
+    def __repr__(self):
+        return f"<User {self.username}>"
+
 class Card(Base):
     __tablename__ = "cards"
     
@@ -32,6 +35,9 @@ class Card(Base):
     user = relationship("User", back_populates="cards")
     study_sessions = relationship("StudySession", back_populates="card", cascade="all, delete-orphan")
 
+    def __repr__(self):
+        return f"<Card {self.id}: {self.topic}>"
+
 class StudySession(Base):
     __tablename__ = "study_sessions"
     
@@ -47,3 +53,6 @@ class StudySession(Base):
     
     card = relationship("Card", back_populates="study_sessions")
     user = relationship("User", back_populates="study_sessions")
+
+    def __repr__(self):
+        return f"<StudySession card_id={self.card_id}>"
