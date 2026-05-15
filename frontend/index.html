@@ -1,0 +1,178 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <meta name="theme-color" content="#4F46E5">
+    <title>Wake and Learn - Smart Flashcards</title>
+    <link rel="stylesheet" href="css/style.css">
+    <link rel="manifest" href="manifest.json">
+    <link rel="apple-touch-icon" href="assets/icon-192.png">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+</head>
+<body>
+    <div class="app-container">
+        <!-- Sidebar Navigation -->
+        <nav class="sidebar">
+            <div class="logo">
+                <span class="logo-icon">📚</span>
+                <span class="logo-text">Wake & Learn</span>
+            </div>
+            <ul class="nav-menu">
+                <li class="nav-item active" data-tab="home">
+                    <span class="nav-icon">🏠</span>
+                    <span>Home</span>
+                </li>
+                <li class="nav-item" data-tab="study">
+                    <span class="nav-icon">📖</span>
+                    <span>Study</span>
+                </li>
+                <li class="nav-item" data-tab="create">
+                    <span class="nav-icon">➕</span>
+                    <span>Create</span>
+                </li>
+                <li class="nav-item" data-tab="stats">
+                    <span class="nav-icon">📊</span>
+                    <span>Stats</span>
+                </li>
+            </ul>
+            <div class="user-info">
+                <div class="user-avatar" id="userAvatar">👤</div>
+                <div class="user-details">
+                    <div class="user-name" id="userName">Guest</div>
+                    <button class="btn-logout" id="logoutBtn" style="display: none;">Logout</button>
+                </div>
+            </div>
+        </nav>
+
+        <!-- Main Content -->
+        <main class="main-content">
+            <!-- Home Tab -->
+            <div id="homeTab" class="tab-content active">
+                <div class="welcome-section">
+                    <h1>Welcome to Wake & Learn! 🌟</h1>
+                    <p>Master new subjects with AI-powered spaced repetition</p>
+                </div>
+                <div class="stats-cards">
+                    <div class="stat-card">
+                        <div class="stat-value" id="totalCards">0</div>
+                        <div class="stat-label">Total Cards</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-value" id="dueCards">0</div>
+                        <div class="stat-label">Due for Review</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-value" id="studiedToday">0</div>
+                        <div class="stat-label">Studied Today</div>
+                    </div>
+                </div>
+                <div class="quick-actions">
+                    <button class="btn-primary" onclick="switchTab('study')">Start Studying →</button>
+                    <button class="btn-secondary" onclick="switchTab('create')">Create New Card +</button>
+                </div>
+            </div>
+
+            <!-- Study Tab -->
+            <div id="studyTab" class="tab-content">
+                <div class="study-header">
+                    <h2>📖 Study Session</h2>
+                    <div class="study-progress">
+                        <span id="cardCounter">Card 0 / 0</span>
+                        <div class="progress-bar">
+                            <div class="progress-fill" id="studyProgress"></div>
+                        </div>
+                    </div>
+                </div>
+                <div class="flashcard-container">
+                    <div class="flashcard" id="flashcard">
+                        <div class="flashcard-inner">
+                            <div class="flashcard-front">
+                                <div class="card-topic" id="cardTopic"></div>
+                                <div class="card-question" id="cardQuestion"></div>
+                                <div class="card-hint">Tap to reveal answer</div>
+                            </div>
+                            <div class="flashcard-back">
+                                <div class="card-answer" id="cardAnswer"></div>
+                                <div class="rating-buttons" id="ratingButtons" style="display: none;">
+                                    <button class="rating-btn hard" data-quality="0">😫 Hard</button>
+                                    <button class="rating-btn good" data-quality="1">😊 Good</button>
+                                    <button class="rating-btn easy" data-quality="2">🎉 Easy</button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="no-cards-message" id="noCardsMessage" style="display: none;">
+                    <p>🎉 No cards due for review!</p>
+                    <button class="btn-primary" onclick="switchTab('create')">Create some cards</button>
+                </div>
+            </div>
+
+            <!-- Create Tab -->
+            <div id="createTab" class="tab-content">
+                <h2>✨ Create New Flashcard</h2>
+                <form id="createCardForm" class="create-form">
+                    <div class="form-group">
+                        <label>Topic / Subject</label>
+                        <input type="text" id="topic" placeholder="e.g., Python, History, Math" required>
+                    </div>
+                    <div class="form-group">
+                        <label>Question</label>
+                        <textarea id="question" rows="3" placeholder="What is the capital of France?" required></textarea>
+                    </div>
+                    <div class="form-group">
+                        <label>Answer</label>
+                        <textarea id="answer" rows="3" placeholder="Paris is the capital of France..." required></textarea>
+                    </div>
+                    <div class="form-group">
+                        <label>Difficulty</label>
+                        <select id="difficulty">
+                            <option value="easy">Easy</option>
+                            <option value="medium" selected>Medium</option>
+                            <option value="hard">Hard</option>
+                        </select>
+                    </div>
+                    <button type="submit" class="btn-primary">Create Card 📝</button>
+                </form>
+            </div>
+
+            <!-- Stats Tab -->
+            <div id="statsTab" class="tab-content">
+                <h2>📊 Your Learning Statistics</h2>
+                <div class="stats-grid">
+                    <div class="stat-detail">
+                        <h3>📈 Study Overview</h3>
+                        <canvas id="studyChart" width="400" height="200"></canvas>
+                    </div>
+                    <div class="stat-detail">
+                        <h3>🏆 Achievements</h3>
+                        <div class="achievements-list" id="achievements">
+                            <div class="achievement">⭐ First card created</div>
+                            <div class="achievement">🔥 5-day study streak</div>
+                            <div class="achievement">💯 50 cards mastered</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <!-- Notification -->
+    <div id="notification" class="notification"></div>
+
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="js/api.js"></script>
+    <script src="js/app.js"></script>
+    <script>
+        if ('serviceWorker' in navigator) {
+            navigator.serviceWorker.register('sw.js').then(reg => {
+                console.log('Service Worker registered');
+            }).catch(err => {
+                console.log('Service Worker registration failed:', err);
+            });
+        }
+    </script>
+</body>
+</html>

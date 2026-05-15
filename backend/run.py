@@ -11,12 +11,12 @@ def setup_environment():
 def install_dependencies():
     print("📦 Installing dependencies...")
     subprocess.run([sys.executable, "-m", "pip", "install", "-q", "-r", "requirements.txt"],
-                   cwd="backend", check=True)
+                   cwd=".", check=True)
     print("✅ Dependencies installed")
 
 def seed_database():
     print("🌱 Seeding database...")
-    subprocess.run([sys.executable, "seed.py"], cwd="backend", check=True)
+    subprocess.run([sys.executable, "seed.py"], cwd=".", check=True)
 
 if __name__ == "__main__":
     setup_environment()
@@ -33,7 +33,6 @@ if __name__ == "__main__":
         print("="*50 + "\n")
         
         import uvicorn
-        os.chdir("backend")
         uvicorn.run(
             "app.main:app",
             host="0.0.0.0",

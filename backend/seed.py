@@ -1,25 +1,27 @@
 #!/usr/bin/env python
-from sqlalchemy.orm import Session
 from app.database import SessionLocal, engine, Base
 from app.models import User, Card, StudySession
-from datetime import datetime, timedelta
+from datetime import datetime
 import logging
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 def seed_database():
+    # Tạo bảng
     Base.metadata.create_all(bind=engine)
     logger.info("Database tables created")
     
     db = SessionLocal()
     
     try:
+        # Kiểm tra đã có dữ liệu chưa
         existing_user = db.query(User).filter(User.username == "demo_user").first()
         if existing_user:
             logger.info("Database already seeded")
             return
         
+        # Tạo user demo
         demo_user = User(
             username="demo_user",
             email="demo@example.com"
@@ -27,6 +29,7 @@ def seed_database():
         db.add(demo_user)
         db.flush()
         
+        # Tạo cards mẫu
         cards_data = [
             {
                 "question": "What is the capital of France?",
@@ -45,6 +48,12 @@ def seed_database():
                 "answer": "William Shakespeare wrote Romeo and Juliet.",
                 "topic": "Literature",
                 "difficulty": "medium"
+            },
+            {
+                "question": "What is 2 + 2?",
+                "answer": "4",
+                "topic": "Mathematics",
+                "difficulty": "easy"
             }
         ]
         
@@ -60,14 +69,15 @@ def seed_database():
             db.add(card)
         
         db.commit()
-        logger.info(f"Successfully seeded database")
+        logger.info("Successfully seeded database")
+        print("✅ Database seeded successfully!")
         
     except Exception as e:
         logger.error(f"Seeding failed: {e}")
         db.rollback()
+        print(f"❌ Seeding failed: {e}")
     finally:
         db.close()
 
 if __name__ == "__main__":
     seed_database()
-    print("✅ Database seeded successfully!")
