@@ -1,83 +1,51 @@
-#!/usr/bin/env python
-from app.database import SessionLocal, engine, Base
-from app.models import User, Card, StudySession
-from datetime import datetime
-import logging
+from app.database import init_db, SessionLocal
+from app.models import User, UserSettings, VocabularyGroup, Vocabulary, UserLearning
+from datetime import date, datetime
 
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger(__name__)
-
-def seed_database():
-    # Tạo bảng
-    Base.metadata.create_all(bind=engine)
-    logger.info("Database tables created")
-    
+def seed():
+    init_db()
     db = SessionLocal()
     
-    try:
-        # Kiểm tra đã có dữ liệu chưa
-        existing_user = db.query(User).filter(User.username == "demo_user").first()
-        if existing_user:
-            logger.info("Database already seeded")
-            return
-        
-        # Tạo user demo
-        demo_user = User(
-            username="demo_user",
-            email="demo@example.com"
+    # Xóa dữ liệu cũ
+    db.query(UserLearning).delete()
+    db.query(Vocabulary).delete()
+    db.query(VocabularyGroup).delete()
+    db.query(UserSettings).delete()
+    db.query(User).delete()
+    
+    from app.main import get_password_hash
+    # Tạo user demo
+    demo = User(username="demo", password=get_password_hash("demo123"), created_at=datetime.now())
+    db.add(demo)
+    db.flush()
+    
+    settings = UserSettings(user_id=demo.id, daily_goal=5)
+    db.add(settings)
+    
+    # Tạo nhóm
+    group = VocabularyGroup(name="IT Helpdesk", language="en", profession="IT", created_by_user=False)
+    db.add(group)
+    db.flush()
+    
+    # Từ mẫu
+    samples = [
+        ("restart", "khởi động lại", "/riːbuːt/", "Please restart your computer.", "Vui lòng khởi động lại máy tính."),
+        ("printer", "máy in", "/prɪntər/", "The printer is out of paper.", "Máy in đã hết giấy."),
+        ("permissions", "quyền truy cập", "/pərmɪʃənz/", "You need admin permissions.", "Bạn cần quyền quản trị.")
+    ]
+    for w in samples:
+        vocab = Vocabulary(
+            group_id=group.id, word=w[0], meaning=w[1], pronunciation=w[2],
+            example=w[3], example_vi=w[4], level="A1"
         )
-        db.add(demo_user)
+        db.add(vocab)
         db.flush()
-        
-        # Tạo cards mẫu
-        cards_data = [
-            {
-                "question": "What is the capital of France?",
-                "answer": "Paris is the capital and most populous city of France.",
-                "topic": "Geography",
-                "difficulty": "easy"
-            },
-            {
-                "question": "What is the chemical formula for water?",
-                "answer": "H2O - Water is composed of two hydrogen atoms and one oxygen atom.",
-                "topic": "Chemistry",
-                "difficulty": "easy"
-            },
-            {
-                "question": "Who wrote Romeo and Juliet?",
-                "answer": "William Shakespeare wrote Romeo and Juliet.",
-                "topic": "Literature",
-                "difficulty": "medium"
-            },
-            {
-                "question": "What is 2 + 2?",
-                "answer": "4",
-                "topic": "Mathematics",
-                "difficulty": "easy"
-            }
-        ]
-        
-        for card_data in cards_data:
-            card = Card(
-                user_id=demo_user.id,
-                question=card_data["question"],
-                answer=card_data["answer"],
-                topic=card_data["topic"],
-                difficulty=card_data["difficulty"],
-                next_review=datetime.now()
-            )
-            db.add(card)
-        
-        db.commit()
-        logger.info("Successfully seeded database")
-        print("✅ Database seeded successfully!")
-        
-    except Exception as e:
-        logger.error(f"Seeding failed: {e}")
-        db.rollback()
-        print(f"❌ Seeding failed: {e}")
-    finally:
-        db.close()
+        learning = UserLearning(vocab_id=vocab.id, user_id=demo.id, next_review=date.today())
+        db.add(learning)
+    
+    db.commit()
+    print("✅ Seeded database with demo user: demo/demo123")
+    db.close()
 
 if __name__ == "__main__":
-    seed_database()
+    seed()

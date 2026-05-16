@@ -5,9 +5,10 @@
 }
 
 body {
-    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    font-family: 'Inter', 'Segoe UI', Roboto, sans-serif;
+    background: #f0f2f5;
     min-height: 100vh;
+    color: #1f2937;
 }
 
 .app {
@@ -107,7 +108,7 @@ body {
 }
 .flashcard {
     width: 100%;
-    height: 400px;
+    min-height: 450px;
     cursor: pointer;
     perspective: 1000px;
     margin-bottom: 2rem;
@@ -125,16 +126,17 @@ body {
     width: 100%;
     height: 100%;
     backface-visibility: hidden;
-    border-radius: 20px;
+    border-radius: 24px;
     display: flex;
     flex-direction: column;
-    justify-content: center;
+    justify-content: flex-start;
     align-items: center;
-    padding: 2rem;
+    padding: 1.5rem;
     text-align: center;
-    box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+    box-shadow: 0 20px 40px rgba(0,0,0,0.1);
+    border: 1px solid rgba(255,255,255,0.2);
 }
-.flashcard-front { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; }
+.flashcard-front { background: white; color: #1f2937; }
 .flashcard-back { background: white; transform: rotateY(180deg); }
 .card-text { font-size: 1.5rem; margin-bottom: 1rem; }
 .audio-btn { background: rgba(0,0,0,0.1); border: none; padding: 8px 16px; border-radius: 20px; cursor: pointer; margin-top: 1rem; }
@@ -233,3 +235,120 @@ body {
 }
 .toast.show { display: block; animation: slideIn 0.3s; }
 @keyframes slideIn { from { transform: translateX(100%); } to { transform: translateX(0); } }
+
+/* Login Overlay */
+.login-overlay {
+    position: fixed;
+    top: 0; left: 0; width: 100%; height: 100%;
+    background: rgba(0, 0, 0, 0.5);
+    backdrop-filter: blur(5px);
+    display: none;
+    justify-content: center;
+    align-items: center;
+    z-index: 2000;
+}
+.login-overlay.active { display: flex; }
+.login-card {
+    background: white;
+    padding: 2rem;
+    border-radius: 20px;
+    width: 90%;
+    max-width: 400px;
+    box-shadow: 0 10px 25px rgba(0,0,0,0.2);
+}
+.login-card h2 { margin-bottom: 1.5rem; text-align: center; }
+
+/* Exercises */
+.exercise-card {
+    background: white;
+    padding: 1.5rem;
+    border-radius: 15px;
+    margin-bottom: 1rem;
+    box-shadow: 0 4px 6px rgba(0,0,0,0.05);
+}
+.exercise-text { font-size: 1.2rem; margin-bottom: 1rem; line-height: 1.5; }
+.exercise-input {
+    border: none;
+    border-bottom: 2px solid #667eea;
+    outline: none;
+    font-size: 1.2rem;
+    width: 100px;
+    text-align: center;
+    color: #667eea;
+    font-weight: bold;
+    background: transparent;
+}
+.exercise-vi { color: #6b7280; font-size: 0.95rem; margin-bottom: 1rem; }
+.exercise-result { margin-top: 1rem; font-weight: bold; }
+.exercise-result.correct { color: #10b981; }
+.exercise-result.incorrect { color: #ef4444; }
+
+/* Flashcard Image & MCQ */
+.flashcard-image {
+    width: 140px;
+    height: 140px;
+    object-fit: contain;
+    border-radius: 50%;
+    margin-bottom: 15px;
+    background: #fff;
+    border: 5px solid #f3f4f6;
+    padding: 15px;
+    box-shadow: 0 8px 15px rgba(0,0,0,0.1);
+    transition: transform 0.3s;
+}
+.flashcard-image:hover { transform: scale(1.1) rotate(5deg); }
+
+.mcq-container {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+    margin-top: 20px;
+    width: 100%;
+}
+
+.mcq-btn {
+    padding: 12px 10px;
+    border: 2px solid #e5e7eb;
+    border-radius: 10px;
+    background: white;
+    color: #4b5563;
+    font-size: 0.95rem;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s;
+    text-align: center;
+}
+
+.mcq-btn:hover {
+    border-color: #667eea;
+    background: #f8fafc;
+}
+
+.mcq-btn.correct {
+    background: #10b981;
+    color: white;
+    border-color: #10b981;
+}
+
+.mcq-btn.incorrect {
+    background: #ef4444;
+    color: white;
+    border-color: #ef4444;
+}
+
+@keyframes shake {
+    0%, 100% { transform: translateX(0); }
+    20% { transform: translateX(-8px); }
+    40% { transform: translateX(8px); }
+    60% { transform: translateX(-8px); }
+    80% { transform: translateX(8px); }
+}
+
+.shake {
+    animation: shake 0.4s ease-in-out;
+}
+
+@keyframes bounce {
+    0%, 100% { transform: scale(1); }
+    50% { transform: scale(1.2) rotate(10deg); }
+}

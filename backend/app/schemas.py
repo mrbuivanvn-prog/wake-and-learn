@@ -1,38 +1,24 @@
 from pydantic import BaseModel
-from datetime import datetime
-from typing import Optional
+from typing import List, Optional
+from datetime import date
 
-class UserBase(BaseModel):
-    username: str
-    email: str
+class VocabularyGroupCreate(BaseModel):
+    name: str
+    language: str
+    profession: str
+    words: List[dict]
 
-class UserCreate(UserBase):
-    pass
+class LearningSession(BaseModel):
+    vocab_id: int
+    is_correct: bool
+    pronunciation_score: Optional[float] = None
 
-class UserResponse(UserBase):
-    id: int
-    created_at: datetime
-    updated_at: datetime
-    
-    class Config:
-        from_attributes = True
+class AlarmConfig(BaseModel):
+    mode: str  # 'soft', 'strict', 'hardcore'
+    ringtone: str
+    wake_up_hour: int
+    wake_up_minute: int
 
-class CardBase(BaseModel):
-    question: str
-    answer: str
-    topic: Optional[str] = None
-    difficulty: str = "medium"
-
-class CardCreate(CardBase):
-    user_id: int
-
-class CardResponse(CardBase):
-    id: int
-    user_id: int
-    image_url: Optional[str] = None
-    created_at: datetime
-    updated_at: datetime
-    next_review: datetime
-    
-    class Config:
-        from_attributes = True
+class UserGoal(BaseModel):
+    target_words: int
+    target_days: int

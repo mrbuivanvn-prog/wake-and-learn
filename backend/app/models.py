@@ -1,53 +1,56 @@
-from sqlalchemy import Column, Integer, String, Text, DateTime, Float, ForeignKey
-from sqlalchemy.orm import relationship
-from datetime import datetime
-from .database import Base
+from sqlalchemy import Column, Integer, String, Float, Boolean, Date, ForeignKey, DateTime, Text
+from sqlalchemy.ext.declarative import declarative_base
+from datetime import date, datetime
+
+Base = declarative_base()
 
 class User(Base):
     __tablename__ = "users"
-    
-    id = Column(Integer, primary_key=True, index=True)
-    username = Column(String(50), unique=True, index=True, nullable=False)
-    email = Column(String(100), unique=True, index=True)
+    id = Column(Integer, primary_key=True)
+    username = Column(String(100), unique=True, nullable=False)
+    password = Column(String(200), nullable=False)
+    email = Column(String(200))
     created_at = Column(DateTime, default=datetime.now)
-    updated_at = Column(DateTime, default=datetime.now, onupdate=datetime.now)
-    
-    cards = relationship("Card", back_populates="user", cascade="all, delete-orphan")
-    study_sessions = relationship("StudySession", back_populates="user", cascade="all, delete-orphan")
 
-class Card(Base):
-    __tablename__ = "cards"
-    
-    id = Column(Integer, primary_key=True, index=True)
-    user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
-    question = Column(Text, nullable=False)
-    answer = Column(Text, nullable=False)
-    question_vn = Column(Text, nullable=True)
-    answer_en = Column(Text, nullable=True)
-    topic = Column(String(200))
-    image_url = Column(String(500))
-    examples_en = Column(Text, nullable=True)
-    examples_vn = Column(Text, nullable=True)
-    difficulty = Column(String(20), default="medium")
-    created_at = Column(DateTime, default=datetime.now)
-    updated_at = Column(DateTime, default=datetime.now, onupdate=datetime.now)
-    next_review = Column(DateTime, default=datetime.now)
-    
-    user = relationship("User", back_populates="cards")
-    study_sessions = relationship("StudySession", back_populates="card", cascade="all, delete-orphan")
+class UserSettings(Base):
+    __tablename__ = "user_settings"
+    user_id = Column(Integer, ForeignKey("users.id"), primary_key=True)
+    alarm_mode = Column(String(20), default="soft")
+    daily_goal = Column(Integer, default=5)
+    streak_days = Column(Integer, default=0)
+    last_learned = Column(Date)
 
-class StudySession(Base):
-    __tablename__ = "study_sessions"
-    
-    id = Column(Integer, primary_key=True, index=True)
-    card_id = Column(Integer, ForeignKey("cards.id", ondelete="CASCADE"), nullable=False)
-    user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
-    ease_factor = Column(Float, default=2.5)
-    interval = Column(Integer, default=1)
-    repetitions = Column(Integer, default=0)
-    next_review = Column(DateTime, default=datetime.now)
+class VocabularyGroup(Base):
+    __tablename__ = "vocabulary_groups"
+    id = Column(Integer, primary_key=True)
+    name = Column(String(200), nullable=False)
+    language = Column(String(10), nullable=False)
+    profession = Column(String(100))
+    created_by_user = Column(Boolean, default=False)
     created_at = Column(DateTime, default=datetime.now)
-    reviewed_at = Column(DateTime)
-    
-    card = relationship("Card", back_populates="study_sessions")
-    user = relationship("User", back_populates="study_sessions")
+
+class Vocabulary(Base):
+    __tablename__ = "vocabularies"
+    id = Column(Integer, primary_key=True)
+    group_id = Column(Integer, ForeignKey("vocabulary_groups.id"))
+    word = Column(String(200), nullable=False)
+    meaning = Column(Text)
+    pronunciation = Column(String(200))
+    level = Column(String(20))
+    example = Column(Text)
+    example_vi = Column(Text)
+    conversation = Column(Text)
+    cloze_text = Column(Text)
+    image_url = Column(Text)
+
+class UserLearning(Base):
+    __tablename__ = "user_learning"
+    id = Column(Integer, primary_key=True)
+    user_id = Column(Integer, ForeignKey("users.id"))
+    vocab_id = Column(Integer, ForeignKey("vocabularies.id"))
+    mastery = Column(Float, default=0.0)
+    review_interval = Column(Integer, default=1)
+    next_review = Column(Date, default=date.today)
+    is_mastered = Column(Boolean, default=False)
+    consecutive_correct = Column(Integer, default=0)
+    last_reviewed = Column(DateTime, default=datetime.now)

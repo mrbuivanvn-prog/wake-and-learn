@@ -6,6 +6,7 @@
     <title>Wake and Learn - Học thông minh với AI</title>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="css/style.css">
+    <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
 </head>
 <body>
     <div class="app">
@@ -39,12 +40,25 @@
                     <span class="icon">💬</span>
                     <span>Trợ lý AI</span>
                 </div>
+                <div class="nav-link" data-tab="exercises">
+                    <span class="icon">✍️</span>
+                    <span>Bài tập điền từ</span>
+                </div>
             </nav>
-            <div class="user-card">
-                <div class="avatar">👤</div>
-                <div class="user-info">
-                    <div class="name" id="username">Đang tải...</div>
-                    <div class="stats" id="userStats">0 thẻ</div>
+            <div class="user-card" style="flex-direction: column; align-items: stretch; padding: 1.5rem;">
+                <div style="display: flex; align-items: center; gap: 10px;">
+                    <div class="avatar">👤</div>
+                    <div class="user-info">
+                        <div class="name" id="username">Đang tải...</div>
+                        <div class="stats" id="userStats" style="cursor: pointer" onclick="logout()">Thoát</div>
+                    </div>
+                </div>
+                <div style="margin-top: 15px;">
+                    <label style="font-size: 12px; color: #666; font-weight: 500;">Mục tiêu học:</label>
+                    <select id="globalLangSelect" style="width: 100%; padding: 6px; border-radius: 8px; border: 1px solid #ddd; margin-top: 5px; font-family: inherit; font-size: 14px; outline: none;">
+                        <option value="en">🇬🇧 Tiếng Anh</option>
+                        <option value="zh">🇨🇳 Tiếng Trung</option>
+                    </select>
                 </div>
             </div>
         </aside>
@@ -86,8 +100,8 @@
                 <h2>➕ Tạo thẻ mới</h2>
                 <div class="form-container">
                     <div class="form-group">
-                        <label>Câu hỏi (Tiếng Anh)</label>
-                        <input type="text" id="newQuestion" placeholder="VD: What is beautiful?">
+                        <label>Từ mới (Tiếng Anh/Trung)</label>
+                        <input type="text" id="newQuestion" placeholder="VD: beautiful hoặc 你好">
                     </div>
                     <div class="form-group">
                         <label>Câu trả lời (Tiếng Việt)</label>
@@ -105,7 +119,7 @@
             <div class="tab" id="ai">
                 <h2>🤖 AI sinh thẻ thông minh</h2>
                 <div class="ai-box">
-                    <input type="text" id="aiWord" placeholder="Nhập từ tiếng Anh (VD: beautiful, computer, happy)">
+                    <input type="text" id="aiWord" placeholder="Nhập từ cần tạo (VD: beautiful, computer, 你好)">
                     <button class="btn btn-primary" onclick="generateAICard()">✨ Sinh thẻ</button>
                     <div id="aiPreview" class="preview-card"></div>
                 </div>
@@ -134,10 +148,43 @@
                     </div>
                 </div>
             </div>
+
+            <!-- Exercises Tab -->
+            <div class="tab" id="exercises">
+                <h2>✍️ Bài tập điền từ</h2>
+                <p>Củng cố từ vựng của bạn với các bài tập điền từ tự động sinh bằng AI.</p>
+                <button class="btn btn-primary" onclick="loadExercises()">🔄 Tải câu hỏi mới</button>
+                <div id="exercisesContainer" style="margin-top: 20px;"></div>
+            </div>
         </main>
     </div>
 
     <div id="toast" class="toast"></div>
+
+    <!-- Gift Overlay -->
+    <div id="giftOverlay" class="login-overlay">
+        <div class="login-card" style="text-align: center; background: linear-gradient(135deg, #fff 0%, #f0f9ff 100%);">
+            <h2 style="color: #667eea; font-size: 2rem;">🎁 QUÀ TẶNG!</h2>
+            <div id="giftIcon" style="font-size: 8rem; margin: 20px 0; animation: bounce 1s infinite;"></div>
+            <div id="giftName" style="font-size: 1.5rem; font-weight: bold; color: #333; margin-bottom: 20px;"></div>
+            <button class="btn btn-primary" onclick="closeGift()">Tuyệt vời! 😍</button>
+        </div>
+    </div>
+
+    <!-- Login Overlay -->
+    <div id="loginOverlay" class="login-overlay active">
+        <div class="login-card">
+            <h2 id="authTitle">Đăng nhập</h2>
+            <div class="form-group">
+                <input type="text" id="authUsername" placeholder="Tên đăng nhập">
+            </div>
+            <div class="form-group">
+                <input type="password" id="authPassword" placeholder="Mật khẩu">
+            </div>
+            <button class="btn btn-primary" onclick="handleAuth()" style="width: 100%;">Tiếp tục</button>
+            <p id="authSwitchText" style="text-align: center; margin-top: 15px; cursor: pointer; color: #667eea;" onclick="toggleAuthMode()">Chưa có tài khoản? Đăng ký</p>
+        </div>
+    </div>
 
     <script src="js/app.js"></script>
 </body>
