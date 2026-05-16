@@ -1,42 +1,26 @@
 from fastapi import FastAPI, HTTPException, Depends
 from fastapi.middleware.cors import CORSMiddleware
-from contextlib import asynccontextmanager
 from sqlalchemy.orm import Session
 from datetime import datetime
 import logging
+import ollama
+import json
 
 from .database import engine, Base, get_db
 from .models import User, Card, StudySession
-from .schemas import UserCreate, UserResponse, CardCreate, CardResponse
-from .ai_service import AIService
 from .image_service import ImageService
 from .spaced_repetition import SpacedRepetition
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-# Tạo bảng trong database
 Base.metadata.create_all(bind=engine)
 
-# Khởi tạo services
-ai_service = AIService()
 image_service = ImageService()
 sr_service = SpacedRepetition()
 
-@asynccontextmanager
-async def lifespan(app: FastAPI):
-    logger.info("App started")
-    yield
-    logger.info("App shutting down")
+app = FastAPI(title="Wake and Learn API")
 
-app = FastAPI(
-    title="Wake and Learn API",
-    description="AI-powered spaced repetition learning system",
-    version="1.0.0",
-    lifespan=lifespan
-)
-
-# CORS middleware
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -45,117 +29,175 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# ============= USER ENDPOINTS =============
-@app.post("/api/users", response_model=UserResponse)
-def create_user(user: UserCreate, db: Session = Depends(get_db)):
-    # Kiểm tra username đã tồn tại
-    existing_user = db.query(User).filter(User.username == user.username).first()
-    if existing_user:
-        raise HTTPException(status_code=400, detail="Username already exists")
-    
-    # Tạo user mới
-    new_user = User(username=user.username, email=user.email)
-    db.add(new_user)
-    db.commit()
-    db.refresh(new_user)
-    return new_user
+# ============ HEALTH ============
+@app.get("/")
+def root():
+    return {"message": "API running"}
 
-@app.get("/api/users/{user_id}", response_model=UserResponse)
+@app.get("/health")
+def health():
+    return {"status": "ok"}
+
+# ============ USER ============
+@app.post("/api/users")
+def create_user(username: str, email: str, db: Session = Depends(get_db)):
+    user = User(username=username, email=email)
+    db.add(user)
+    db.commit()
+    db.refresh(user)
+    return {"id": user.id, "username": user.username, "email": user.email}
+
+@app.get("/api/users/{user_id}")
 def get_user(user_id: int, db: Session = Depends(get_db)):
     user = db.query(User).filter(User.id == user_id).first()
     if not user:
-        raise HTTPException(status_code=404, detail="User not found")
+        raise HTTPException(404, "User not found")
     return user
 
-# ============= CARD ENDPOINTS =============
-@app.post("/api/cards", response_model=CardResponse)
-def create_card(card: CardCreate, db: Session = Depends(get_db)):
-    # Kiểm tra user tồn tại
-    user = db.query(User).filter(User.id == card.user_id).first()
-    if not user:
-        raise HTTPException(status_code=404, detail="User not found")
-    
-    # Tạo card mới
-    new_card = Card(
-        user_id=card.user_id,
-        question=card.question,
-        answer=card.answer,
-        topic=card.topic,
-        difficulty=card.difficulty or "medium"
-    )
-    
-    db.add(new_card)
-    db.commit()
-    db.refresh(new_card)
-    return new_card
+# ============ CARD ============
+@app.post("/api/cards")
+def create_card(card_data: dict, db: Session = Depends(get_db)):
+    try:
+        user_id = card_data.get("user_id")
+        question = card_data.get("question")
+        answer = card_data.get("answer")
+        topic = card_data.get("topic", "General")
+        difficulty = card_data.get("difficulty", "medium")
+        
+        logger.info(f"📝 Saving card: {question} -> {answer}")
+        
+        user = db.query(User).filter(User.id == user_id).first()
+        if not user:
+            raise HTTPException(404, f"User {user_id} not found")
+        
+        card = Card(
+            user_id=user_id,
+            question=question,
+            answer=answer,
+            topic=topic,
+            difficulty=difficulty
+        )
+        
+        db.add(card)
+        db.commit()
+        db.refresh(card)
+        
+        logger.info(f"✅ Card saved: id={card.id}")
+        return {"id": card.id, "question": card.question, "answer": card.answer, "topic": card.topic}
+    except Exception as e:
+        logger.error(f"Error saving card: {e}")
+        raise HTTPException(500, str(e))
 
 @app.get("/api/users/{user_id}/cards")
-def get_user_cards(user_id: int, db: Session = Depends(get_db)):
-    cards = db.query(Card).filter(Card.user_id == user_id).all()
-    return cards
-
-@app.get("/api/cards/{card_id}", response_model=CardResponse)
-def get_card(card_id: int, db: Session = Depends(get_db)):
-    card = db.query(Card).filter(Card.id == card_id).first()
-    if not card:
-        raise HTTPException(status_code=404, detail="Card not found")
-    return card
-
-@app.delete("/api/cards/{card_id}")
-def delete_card(card_id: int, db: Session = Depends(get_db)):
-    card = db.query(Card).filter(Card.id == card_id).first()
-    if not card:
-        raise HTTPException(status_code=404, detail="Card not found")
-    
-    db.delete(card)
-    db.commit()
-    return {"message": "Card deleted successfully"}
+def get_cards(user_id: int, db: Session = Depends(get_db)):
+    return db.query(Card).filter(Card.user_id == user_id).all()
 
 @app.get("/api/users/{user_id}/due-cards")
 def get_due_cards(user_id: int, db: Session = Depends(get_db)):
     now = datetime.now()
-    due_cards = db.query(Card).filter(
-        Card.user_id == user_id,
-        Card.next_review <= now
-    ).all()
-    return due_cards
+    return db.query(Card).filter(Card.user_id == user_id, Card.next_review <= now).all()
 
+# ============ STUDY SESSION ============
 @app.post("/api/study-sessions")
 def create_study_session(session_data: dict, db: Session = Depends(get_db)):
-    # Kiểm tra card tồn tại
-    card = db.query(Card).filter(Card.id == session_data.get("card_id")).first()
+    card_id = session_data.get("card_id")
+    user_id = session_data.get("user_id")
+    quality = session_data.get("quality", 1)
+    
+    card = db.query(Card).filter(Card.id == card_id).first()
     if not card:
-        raise HTTPException(status_code=404, detail="Card not found")
+        raise HTTPException(404, "Card not found")
     
-    # Tính next_review
-    next_review = sr_service.calculate_next_review(
-        ease_factor=session_data.get("ease_factor", 2.5),
-        interval=session_data.get("interval", 1),
-        repetitions=session_data.get("repetitions", 0)
-    )
+    interval = quality == 2 and 3 or (quality == 1 and 1 or 0)
+    from datetime import timedelta
+    card.next_review = datetime.now() + timedelta(days=interval)
     
-    # Tạo study session
-    new_session = StudySession(
-        card_id=session_data.get("card_id"),
-        user_id=session_data.get("user_id"),
-        ease_factor=session_data.get("ease_factor", 2.5),
-        interval=session_data.get("interval", 1),
-        repetitions=session_data.get("repetitions", 0),
-        next_review=next_review,
+    session = StudySession(
+        card_id=card_id,
+        user_id=user_id,
+        ease_factor=2.5,
+        interval=interval,
+        repetitions=1,
+        next_review=card.next_review,
         reviewed_at=datetime.now()
     )
     
-    # Cập nhật card next_review
-    card.next_review = next_review
-    
-    db.add(new_session)
+    db.add(session)
     db.commit()
-    db.refresh(new_session)
-    return new_session
+    return {"status": "ok"}
 
-@app.get("/api/health")
-def health_check():
-    return {"status": "healthy", "timestamp": datetime.now().isoformat()}
+# ============ AI GENERATE CARD (có tiếng Việt) ============
+@app.post("/api/ai/generate-card")
+def generate_card(word: str, db: Session = Depends(get_db)):
+    try:
+        user = db.query(User).first()
+        if not user:
+            user = User(username="demo", email="demo@example.com")
+            db.add(user)
+            db.commit()
+            db.refresh(user)
+        
+        # Prompt yêu cầu AI trả về cả tiếng Anh và tiếng Việt
+        prompt = f"""Create a bilingual flashcard for the word "{word}".
+        
+Return ONLY valid JSON in this format:
+{{
+    "question_en": "What is the meaning of '{word}'?",
+    "answer_vi": "nghĩa của từ {word}",
+    "question_vi": "'{word}' nghĩa là gì?",
+    "answer_en": "meaning of {word}",
+    "examples_en": ["Example sentence 1", "Example sentence 2"],
+    "examples_vi": ["Ví dụ câu 1", "Ví dụ câu 2"]
+}}
+
+Make it useful for learning English-Vietnamese."""
+        
+        response = ollama.chat(
+            model="qwen2.5:3b",
+            messages=[{"role": "user", "content": prompt}],
+            options={"temperature": 0.7}
+        )
+        
+        text = response['message']['content'].strip()
+        text = text.replace('```json', '').replace('```', '')
+        
+        try:
+            card_data = json.loads(text)
+        except:
+            card_data = {
+                "question_en": f"What is {word}?",
+                "answer_vi": f"{word}",
+                "examples_en": [f"This is an example with {word}"],
+                "examples_vi": [f"Đây là ví dụ với {word}"]
+            }
+        
+        # Tạo card với cả hai ngôn ngữ
+        card = Card(
+            user_id=user.id,
+            question=card_data.get("question_en", f"What is {word}?"),
+            answer=card_data.get("answer_vi", word),
+            topic="Vocabulary",
+            difficulty="medium"
+        )
+        
+        db.add(card)
+        db.commit()
+        db.refresh(card)
+        
+        return {
+            "card": {
+                "id": card.id,
+                "question": card.question,
+                "answer": card.answer,
+                "question_vi": card_data.get("question_vi", f"'{word}' nghĩa là gì?"),
+                "answer_en": card_data.get("answer_en", word),
+                "examples_en": card_data.get("examples_en", []),
+                "examples_vi": card_data.get("examples_vi", [])
+            }
+        }
+    except Exception as e:
+        logger.error(f"AI generation error: {e}")
+        raise HTTPException(500, str(e))
 
 if __name__ == "__main__":
     import uvicorn

@@ -13,7 +13,7 @@ ENV/
 *.db
 *.sqlite
 *.sqlite3
-database/*.db
+backend/database/*.db
 
 # IDE
 .vscode/
@@ -28,16 +28,13 @@ Thumbs.db
 # Logs
 *.log
 logs/
+/tmp/
 
-# Environment variables
+# Environment
 .env
 .env.local
 
-# Frontend cache
-node_modules/
-.cache/
-
-# Backup files
+# Backups
 *.bak
 *.backup
 backup/
@@ -50,13 +47,3 @@ assets/images/cache/
 *.egg-info/
 dist/
 build/
-
-# Testing
-.pytest_cache/
-.coverage
-htmlcov/
-
-# Secrets
-*.key
-*.pem
-*.crt

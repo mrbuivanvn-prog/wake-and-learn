@@ -15,9 +15,6 @@ class User(Base):
     cards = relationship("Card", back_populates="user", cascade="all, delete-orphan")
     study_sessions = relationship("StudySession", back_populates="user", cascade="all, delete-orphan")
 
-    def __repr__(self):
-        return f"<User {self.username}>"
-
 class Card(Base):
     __tablename__ = "cards"
     
@@ -25,8 +22,12 @@ class Card(Base):
     user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
     question = Column(Text, nullable=False)
     answer = Column(Text, nullable=False)
+    question_vn = Column(Text, nullable=True)
+    answer_en = Column(Text, nullable=True)
     topic = Column(String(200))
     image_url = Column(String(500))
+    examples_en = Column(Text, nullable=True)
+    examples_vn = Column(Text, nullable=True)
     difficulty = Column(String(20), default="medium")
     created_at = Column(DateTime, default=datetime.now)
     updated_at = Column(DateTime, default=datetime.now, onupdate=datetime.now)
@@ -34,9 +35,6 @@ class Card(Base):
     
     user = relationship("User", back_populates="cards")
     study_sessions = relationship("StudySession", back_populates="card", cascade="all, delete-orphan")
-
-    def __repr__(self):
-        return f"<Card {self.id}: {self.topic}>"
 
 class StudySession(Base):
     __tablename__ = "study_sessions"
@@ -53,6 +51,3 @@ class StudySession(Base):
     
     card = relationship("Card", back_populates="study_sessions")
     user = relationship("User", back_populates="study_sessions")
-
-    def __repr__(self):
-        return f"<StudySession card_id={self.card_id}>"

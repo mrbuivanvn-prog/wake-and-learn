@@ -1,0 +1,116 @@
+let userId = 1;
+
+async function init() {
+    document.getElementById('username').innerText = 'demo';
+    await loadStats();
+    setupTabs();
+}
+
+async function loadStats() {
+    let res = await fetch(`http://localhost:8000/api/users/${userId}/cards`);
+    let cards = await res.json();
+    document.getElementById('totalCards').innerText = cards.length;
+    document.getElementById('userStats').innerText = `${cards.length} thẻ`;
+}
+
+function setupTabs() {
+    document.querySelectorAll('.nav-link').forEach(link => {
+        link.onclick = (e) => {
+            e.preventDefault();
+            let tab = link.dataset.tab;
+            document.querySelectorAll('.nav-link').forEach(l => l.classList.remove('active'));
+            link.classList.add('active');
+            document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+            document.getElementById(tab).classList.add('active');
+            if (tab === 'study') loadStudy();
+        };
+    });
+}
+
+async function loadStudy() {
+    let res = await fetch(`http://localhost:8000/api/users/${userId}/due-cards`);
+    let cards = await res.json();
+    let html = '<div class="ai-box">';
+    if (cards.length === 0) {
+        html += '<p>🎉 Không có thẻ cần ôn!</p>';
+    } else {
+        html += cards.map(c => `
+            <div style="padding:1rem; margin:0.5rem 0; background:#f0fdf4; border-radius:10px;">
+                <strong>${c.question}</strong><br>
+                ${c.answer}
+            </div>
+        `).join('');
+    }
+    html += '</div>';
+    document.getElementById('studyContent').innerHTML = html;
+}
+
+window.generateAICard = async function() {
+    let word = document.getElementById('aiWord').value;
+    if (!word) {
+        alert('Nhập từ cần học!');
+        return;
+    }
+    
+    showToast('🤖 AI đang sinh thẻ...');
+    
+    try {
+        let aiRes = await fetch(`http://localhost:8000/api/ai/generate-bilingual-card?word=${word}`, {
+            method: 'POST'
+        });
+        let data = await aiRes.json();
+        
+        let html = `
+            <div style="background:#e8f5e9; padding:1rem; border-radius:12px; margin:1rem 0;">
+                <strong>🇬🇧 ${data.card.question}</strong>
+            </div>
+            <div style="background:#e3f2fd; padding:1rem; border-radius:12px; margin:1rem 0;">
+                <strong>🇻🇳 ${data.card.answer}</strong>
+            </div>
+            <div style="background:#fff3e0; padding:1rem; border-radius:12px;">
+                <strong>📚 Ví dụ:</strong><br>
+                🇬🇧 ${(data.examples_en || []).join('<br>🇬🇧 ')}
+            </div>
+            <button class="btn btn-primary" style="margin-top:1rem;" onclick="saveCard('${data.card.question}', '${data.card.answer}')">
+                💾 Lưu thẻ
+            </button>
+        `;
+        document.getElementById('aiPreview').innerHTML = html;
+        showToast('✅ Đã sinh thẻ, bấm lưu để thêm vào thư viện');
+    } catch(e) {
+        showToast('Lỗi: ' + e.message);
+    }
+};
+
+window.saveCard = async function(question, answer) {
+    let res = await fetch('http://localhost:8000/api/cards', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({
+            user_id: userId,
+            question: question,
+            answer: answer,
+            topic: 'AI Generated',
+            difficulty: 'medium'
+        })
+    });
+    
+    if (res.ok) {
+        showToast('✅ Đã lưu thẻ!');
+        document.getElementById('aiWord').value = '';
+        document.getElementById('aiPreview').innerHTML = '';
+        loadStats();
+    } else {
+        let err = await res.text();
+        showToast('❌ Lỗi: ' + err);
+    }
+};
+
+function showToast(msg) {
+    let toast = document.getElementById('toast');
+    toast.innerText = msg;
+    toast.classList.add('show');
+    setTimeout(() => toast.classList.remove('show'), 3000);
+}
+
+init();
