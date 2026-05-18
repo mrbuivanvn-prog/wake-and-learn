@@ -17,6 +17,8 @@ class UserSettings(Base):
     user_id = Column(Integer, ForeignKey("users.id"), primary_key=True)
     alarm_mode = Column(String(20), default="soft")
     daily_goal = Column(Integer, default=5)
+    profession = Column(String(100), default="Công nghệ thông tin (IT)")
+    learning_language = Column(String(10), default="en")
     streak_days = Column(Integer, default=0)
     last_learned = Column(Date)
 
@@ -33,12 +35,17 @@ class Vocabulary(Base):
     __tablename__ = "vocabularies"
     id = Column(Integer, primary_key=True)
     group_id = Column(Integer, ForeignKey("vocabulary_groups.id"))
-    word = Column(String(200), nullable=False)
+    word = Column(String(200), nullable=False) # Tiêu đề chính
+    word_en = Column(String(200))
+    word_zh = Column(String(200))
+    pinyin = Column(String(200))
     meaning = Column(Text)
     pronunciation = Column(String(200))
+    mode = Column(String(20), default="en") # en, zh, trilingual
     level = Column(String(20))
-    example = Column(Text)
-    example_vi = Column(Text)
+    example = Column(Text) # Câu ví dụ EN hoặc ZH
+    example_zh = Column(Text) # Câu ví dụ ZH nếu học 3 ngôn ngữ
+    example_vi = Column(Text) # Câu ví dụ VI
     conversation = Column(Text)
     cloze_text = Column(Text)
     image_url = Column(Text)

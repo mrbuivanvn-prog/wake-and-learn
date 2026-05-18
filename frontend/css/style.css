@@ -136,6 +136,10 @@ body {
     box-shadow: 0 20px 40px rgba(0,0,0,0.1);
     border: 1px solid rgba(255,255,255,0.2);
 }
+.badge { padding: 4px 10px; border-radius: 6px; font-size: 10px; font-weight: 700; text-transform: uppercase; display: inline-block; margin-bottom: 5px; }
+.badge-en { background: #dbeafe; color: #1e40af; }
+.badge-zh { background: #fef3c7; color: #92400e; }
+.badge-trilingual { background: #dcfce7; color: #166534; }
 .flashcard-front { background: white; color: #1f2937; }
 .flashcard-back { background: white; transform: rotateY(180deg); }
 .card-text { font-size: 1.5rem; margin-bottom: 1rem; }
@@ -234,8 +238,10 @@ body {
     z-index: 1000;
 }
 .toast.show { display: block; animation: slideIn 0.3s; }
-@keyframes slideIn { from { transform: translateX(100%); } to { transform: translateX(0); } }
-
+@keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+}
 /* Login Overlay */
 .login-overlay {
     position: fixed;

@@ -1,26 +1,58 @@
 import requests
+import json
+import re
 from typing import List, Dict
 
 class AIService:
     def __init__(self):
         self.ollama_url = "http://localhost:11434/api/generate"
     
-    def translate(self, word: str, lang: str = "en") -> str:
-        """Dịch từ sang tiếng Việt"""
+    def translate_trilingual(self, word: str, profession: str = "Tổng quát") -> Dict:
+        """Dịch 3 ngôn ngữ song song với quy trình kiểm chứng tích hợp."""
         try:
-            if lang == "zh":
-                prompt = f"Dịch từ tiếng Trung '{word}' sang tiếng Việt. Nếu từ có nhiều nghĩa, hãy liệt kê 2-3 nghĩa THÔNG DỤNG nhất, cách nhau bằng dấu phẩy. Định dạng: [Nghĩa] (Pinyin: [Phiên âm]). Chỉ trả về nghĩa, không giải thích."
-            else:
-                prompt = f"Dịch từ tiếng Anh '{word}' sang tiếng Việt. Nếu từ có nhiều nghĩa, hãy liệt kê 2-3 nghĩa THÔNG DỤNG nhất, cách nhau bằng dấu phẩy. Tuyệt đối không dùng từ lạ, từ cổ hay từ không tự nhiên. Chỉ trả về các nghĩa, không giải thích."
-                
+            role = f"Chuyên gia ngành {profession}" if profession != "Tổng quát" else "Biên dịch viên"
+            prompt = f"""Bạn là {role}. Hãy dịch từ '{word}' sang EN, ZH (Pinyin) và VI.
+YÊU CẦU:
+- Dùng thuật ngữ chuyên môn ngành {profession}.
+- Kiểm tra chéo nghĩa giữa các ngôn ngữ để đảm bảo đồng nhất.
+- Trả về JSON: {{"en":"...", "zh":"...", "pinyin":"...", "vi":"..."}}
+Ví dụ: {{"en":"server", "zh":"服务器", "pinyin":"fúwùqì", "vi":"máy chủ"}}"""
+
+            resp = requests.post(self.ollama_url, json={
+                "model": "qwen2.5:3b",
+                "prompt": prompt,
+                "format": "json",
+                "stream": False,
+                "options": { "temperature": 0 }
+            }, timeout=25)
+            
+            if resp.status_code == 200:
+                data = json.loads(resp.json().get("response", "{}"))
+                for k in data:
+                    if isinstance(data[k], str):
+                        data[k] = re.sub(r'[\[\]|\\/]', '', data[k]).strip()
+                return data
+        except Exception as e:
+            print(f"!!! AI Trilingual Error: {e}")
+        return {"en": word, "zh": word, "pinyin": "", "vi": "Lỗi dịch thuật"}
+
+    def translate(self, word: str, lang: str = "en", profession: str = "Tổng quát") -> str:
+        """Professional Expert: Bắt buộc dịch theo thuật ngữ chuyên ngành."""
+        try:
+            role = f"Chuyên gia cấp cao trong ngành {profession}" if profession != "Tổng quát" else "Chuyên gia ngôn ngữ"
+            target = "tiếng Việt" if lang == "en" else "tiếng Việt từ tiếng Trung"
+            prompt = f"""Bạn là {role}. Hãy dịch từ '{word}' sang {target}.
+YÊU CẦU BẮT BUỘC: 
+- Phải sử dụng đúng thuật ngữ chuyên môn của ngành {profession}.
+- Trả về đúng 1-2 nghĩa sát nhất. Không giải thích."""
+            
             resp = requests.post(self.ollama_url, json={
                 "model": "qwen2.5:3b",
                 "prompt": prompt,
                 "stream": False,
-                "options": {
-                    "temperature": 0
-                }
+                "options": { "temperature": 0 }
             }, timeout=15)
+            
             if resp.status_code == 200:
                 result = resp.json().get("response", "").strip()
                 # Clean up: If not ZH, remove any Chinese characters that might have leaked
@@ -44,20 +76,35 @@ class AIService:
         }
         return fallback.get(word.lower(), word)
     
-    def example(self, word: str, meaning: str, lang: str = "en") -> Dict:
-        """Tạo ví dụ kèm bản dịch"""
+    def example_trilingual(self, word_en: str, word_zh: str, meaning_vi: str, profession: str = "Tổng quát") -> Dict:
+        """Tạo ví dụ 3 ngôn ngữ. BẮT BUỘC chứa từ vựng trong câu."""
         try:
+            prompt = f"Viết 1 câu ví dụ ngành {profession} CHỨA CẢ HAI TỪ '{word_en}' và '{word_zh}'. Trả về 1 dòng JSON: {{\"en\":\"...\", \"zh\":\"... (pinyin)\", \"vi\":\"...\"}}"
+            resp = requests.post(self.ollama_url, json={
+                "model": "qwen2.5:3b",
+                "prompt": prompt,
+                "stream": False,
+                "options": { "temperature": 0, "num_predict": 300 }
+            }, timeout=40)
+            if resp.status_code == 200:
+                text = resp.json().get("response", "").strip()
+                import json, re
+                match = re.search(r'\{.*\}', text)
+                if match:
+                    return json.loads(match.group())
+        except Exception as e:
+            print(f"!!! AI Example Error: {e}")
+        return {"en": "Example error", "zh": "", "vi": ""}
+
+    def example(self, word: str, meaning: str, lang: str = "en", profession: str = "Tổng quát") -> Dict:
+        """Scenario Master: Tạo tình huống công việc chuyên sâu."""
+        try:
+            role = f"chuyên gia làm việc trong ngành {profession}" if profession != "Tổng quát" else "người bản xứ"
             if lang == "zh":
-                prompt = f"""Bạn là giáo viên mầm non. Hãy lấy nghĩa đầu tiên của '{meaning}' và tạo 1 câu ví dụ CỰC KỲ ĐƠN GIẢN cho trẻ em bằng tiếng Trung (giản thể) sử dụng từ '{word}' theo đúng nghĩa đó.
-Trả về đúng định dạng:
-ZH: [câu tiếng Trung đơn giản] (Pinyin: [phiên âm pinyin])
-VI: [câu tiếng Việt]"""
+                prompt = f"Bạn là {role}. Hãy viết 1 câu ví dụ thực tế TRONG CÔNG VIỆC dùng từ '{word}' ({meaning}). Câu phải thể hiện kiến thức chuyên sâu về {profession}. Định dạng: ZH: [câu] (Pinyin: [pinyin]) | VI: [dịch]"
                 target_prefix = "ZH:"
             else:
-                prompt = f"""Bạn là giáo viên mầm non. Hãy lấy nghĩa đầu tiên của '{meaning}' và tạo 1 câu ví dụ CỰC KỲ ĐƠN GIẢN cho trẻ em bằng tiếng Anh sử dụng từ '{word}' theo đúng nghĩa đó.
-Trả về đúng định dạng:
-EN: [câu tiếng Anh đơn giản]
-VI: [câu tiếng Việt]"""
+                prompt = f"Bạn là {role}. Hãy viết 1 câu ví dụ thực tế TRONG CÔNG VIỆC dùng từ '{word}' ({meaning}). Câu phải thể hiện kiến thức chuyên sâu về {profession}. Định dạng: EN: [câu] | VI: [dịch]"
                 target_prefix = "EN:"
                 
             resp = requests.post(self.ollama_url, json={
@@ -92,13 +139,13 @@ VI: [câu tiếng Việt]"""
         pattern = re.compile(re.escape(word), re.IGNORECASE)
         return pattern.sub("_____", example)
     
-    def conversation(self, word: str, lang: str = "en") -> str:
-        """Tạo hội thoại ngắn"""
+    def conversation(self, word: str, lang: str = "en", profession: str = "Tổng quát") -> str:
+        """Tạo hội thoại ngắn theo chuyên ngành"""
         try:
             if lang == "zh":
-                prompt = f"Bạn là giáo viên mầm non. Tạo một đoạn hội thoại tiếng Trung giản thể cực ngắn (2 câu) cho trẻ em sử dụng từ '{word}', có kèm theo pinyin. Nội dung vui vẻ về đồ chơi hoặc trường học."
+                prompt = f"Bạn là một người làm trong ngành {profession}. Tạo một đoạn hội thoại công việc tiếng Trung giản thể ngắn (2 câu) sử dụng từ '{word}', có kèm theo pinyin. Nội dung xoay quanh tình huống thực tế trong ngành {profession}."
             else:
-                prompt = f"Bạn là giáo viên mầm non. Tạo một đoạn hội thoại tiếng Anh cực ngắn (2 câu) cho trẻ em sử dụng từ '{word}'. Nội dung vui vẻ, đơn giản về đồ chơi hoặc trường học."
+                prompt = f"Bạn là một người làm trong ngành {profession}. Tạo một đoạn hội thoại công việc tiếng Anh ngắn (2 câu) sử dụng từ '{word}'. Nội dung xoay quanh tình huống thực tế trong ngành {profession}."
                 
             resp = requests.post(self.ollama_url, json={
                 "model": "qwen2.5:3b",
