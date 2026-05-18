@@ -244,8 +244,6 @@ window.showStudyCard = function() {
     }
     let card = dueCards[currentCardIndex];
     let langCode = card.language || 'en';
-    let flag = langCode === 'zh' ? '🇨🇳' : '🇬🇧';
-    let audioText = '🔊 Nghe';
     let imgKeyword = card.word_en || card.word;
     let wordClean = imgKeyword ? imgKeyword.trim().toLowerCase().replace(/[^\w\s]/gi, '') : "object";
     
@@ -264,28 +262,34 @@ window.showStudyCard = function() {
     let imgUrl = `https://image.pollinations.ai/prompt/professional%20clean%203D%20render%20of%20${encodeURIComponent(wordClean)}%20related%20to%20${encodeURIComponent(rawProf)},%20modern%20style,%20white%20background?width=400&height=400&seed=${seed}`;
 
     let phoneticsHtml = '';
-    // Determine if this is a Chinese, English, or trilingual card
-    let isChinese = card.word_zh && !card.word_en;
-    let isTrilingual = card.word_en && card.word_zh;
-    let isEnglish = !card.word_zh && card.word_en;
-    
-    if (isTrilingual) {
+    let badgeClass = '';
+    let badgeText = '';
+    // Ưu tiên dùng mode từ API (luôn có giá trị: 'en' | 'zh' | 'trilingual')
+    let cardMode = card.mode || 'en';
+
+    if (cardMode === 'trilingual') {
+        badgeClass = 'badge badge-trilingual';
+        badgeText = '🌍 3 Ngôn ngữ';
         phoneticsHtml = `
-            <div style="font-size: 1.15rem; color: #475569; margin-bottom: 12px; font-weight: 500;">
-                ${card.pronunciation ? `🇬🇧 <span style="font-family: 'Outfit', sans-serif; color: #4f46e5;">${card.pronunciation}</span>` : ''}
-                ${card.pinyin ? ` &nbsp; 🇨🇳 <span style="color: #ea580c; font-weight: 600;">[ ${card.pinyin} ]</span>` : ''}
+            <div style="font-size: 1.15rem; color: #475569; margin-bottom: 5px; font-weight: 500; line-height: 1.6;">
+                ${card.pronunciation ? `🇬🇧 <span style="font-family: 'Outfit', sans-serif; color: #4f46e5;">${card.pronunciation}</span>` : (card.word_en ? `🇬🇧 /${card.word_en}/` : '')}
+                ${card.pinyin ? `<br>🇨🇳 <span style="color: #ea580c; font-weight: 600;">[ ${card.pinyin} ]</span>` : ''}
             </div>
         `;
-    } else if (isChinese) {
+    } else if (cardMode === 'zh') {
+        badgeClass = 'badge badge-zh';
+        badgeText = '🇨🇳 Tiếng Trung';
         phoneticsHtml = `
-            <div style="font-size: 1.15rem; color: #ea580c; margin-bottom: 12px; font-weight: 600;">
-                🇨🇳 [ ${card.pinyin || card.word} ]
+            <div style="font-size: 1.3rem; color: #ea580c; margin-bottom: 10px; font-weight: 700; line-height: 1.5;">
+                ${card.pinyin ? `📖 [ ${card.pinyin} ]` : (card.word_zh || card.word)}
             </div>
         `;
     } else {
+        badgeClass = 'badge badge-en';
+        badgeText = '🇬🇧 Tiếng Anh';
         phoneticsHtml = `
-            <div style="font-size: 1.15rem; color: #4f46e5; margin-bottom: 12px; font-weight: 500; font-family: 'Outfit', sans-serif;">
-                🇬🇧 ${card.pronunciation || `/${card.word}/`}
+            <div style="font-size: 1.15rem; color: #4f46e5; margin-bottom: 10px; font-weight: 500; font-family: 'Outfit', sans-serif; line-height: 1.6;">
+                ${card.pronunciation ? card.pronunciation : (card.word_en ? `/${card.word_en}/` : `/${card.word}/`)}
             </div>
         `;
     }
@@ -304,22 +308,23 @@ window.showStudyCard = function() {
                         </div>
                         
                         <!-- Image Container with Smooth Shimmer Loading -->
-                        <div style="position: relative; width: 140px; height: 140px; margin-bottom: 15px; margin-top: 2rem;">
+                        <div style="position: relative; width: 140px; height: 140px; margin-bottom: 15px; margin-top: 1.8rem;">
                             <div class="image-skeleton" style="position: absolute; top:0; left:0; width:100%; height:100%; border-radius:50%; background: linear-gradient(90deg, #f3f4f6 25%, #e5e7eb 50%, #f3f4f6 75%); background-size: 200% 100%; animation: shimmer 1.5s infinite; border: 5px solid #f3f4f6;"></div>
-                            <img src="${imgUrl}" class="flashcard-image" alt="Visual" 
+                            <img src="${card.image_url || imgUrl}" class="flashcard-image" alt="Hình ảnh" 
                                  onload="this.style.opacity=1; this.previousElementSibling.style.display='none';" 
-                                 onerror="this.onerror=null; this.src='https://img.icons8.com/color/200/${wordClean}.png'; this.previousElementSibling.style.display='none';"
+                                 onerror="this.onerror=null; this.src='https://img.icons8.com/color/200/${encodeURIComponent(wordClean)}.png'; this.previousElementSibling.style.display='none';"
                                  style="opacity: 0; transition: opacity 0.3s; margin-top: 0; position: absolute; top:0; left:0; width:100%; height:100%; z-index: 2;">
                         </div>
                         
-                        <div class="card-text" style="color: #000; font-weight: bold; font-size: 1.8rem; margin-top: 1rem;">
-                            ${card.word_en && card.word_zh ? `<span>🇬🇧 ${card.word_en}</span><br><span>🇨🇳 ${card.word_zh}</span>` : `${flag} ${card.word}`}
+                        <div class="card-text" style="color: #000; font-weight: bold; font-size: 1.8rem; margin-top: 2rem; line-height: 1.5;">
+                            ${cardMode === 'trilingual' ? `<span>🇬🇧 ${card.word_en || card.word}</span><br><span style="color:#dc2626;">🇨🇳 ${card.word_zh || ''}</span>` : cardMode === 'zh' ? `<span style="color:#dc2626;">🇨🇳 ${card.word_zh || card.word}</span>` : `<span>🇬🇧 ${card.word_en || card.word}</span>`}
                         </div>
                         
-                        <!-- Hiển thị ví dụ gốc để học viên liên tưởng trước -->
+                        <!-- Ví dụ gợi ý trên mặt trước -->
                         <div style="margin-top: 1rem; padding: 0 10px; text-align: center; width: 100%;">
-                            ${card.example ? `<div style="font-size: 0.95rem; color: #475569; font-style: italic; line-height: 1.4;">"${card.example}"</div>` : ''}
-                            ${card.example_zh ? `<div style="font-size: 0.95rem; color: #475569; font-style: italic; line-height: 1.4; margin-top: 5px;">"${card.example_zh}"</div>` : ''}
+                            ${card.example ? `<div style="font-size: 0.85rem; color: #4f46e5; font-style: italic; line-height: 1.4; margin-bottom: 4px;">🇬🇧 "${card.example}"</div>` : ''}
+                            ${card.example_zh ? `<div style="font-size: 0.85rem; color: #ea580c; font-style: italic; line-height: 1.4; margin-bottom: 4px;">🇨🇳 "${card.example_zh}"</div>` : ''}
+                            ${card.example_vi ? `<div style="font-size: 0.85rem; color: #10b981; font-style: italic; line-height: 1.4;">🇻🇳 "${card.example_vi}"</div>` : ''}
                         </div>
                         
                         <p style="color: #64748b; margin-top: auto; font-size: 0.9rem; font-weight: 500; letter-spacing: 0.2px;">(Chạm vào thẻ để lật xem nghĩa & nghe phát âm)</p>
@@ -327,23 +332,27 @@ window.showStudyCard = function() {
 
                     <!-- MẶT SAU -->
                     <div class="flashcard-back">
-                        <div style="font-size: 1.8rem; font-weight: 800; color: #10b981; margin-bottom: 5px;">🇻🇳 ${card.meaning}</div>
+                        <div style="font-size: 1.8rem; font-weight: 800; color: #10b981; margin-bottom: 3px; line-height: 1.3;">🇻🇳 ${card.meaning}</div>
+                        
+                        <div style="font-size: 0.9rem; color: #94a3b8; margin-bottom: 10px;">${card.level || 'A1'}</div>
+                        
                         ${phoneticsHtml}
                         
-                        <div style="width: 100%; max-height: 180px; overflow-y: auto; text-align: left; background: #f8fafc; padding: 15px; border-radius: 12px; margin-bottom: 10px; border: 1px solid #f1f5f9;">
+                        <!-- Nội dung ví dụ chi tiết -->
+                        <div style="width: 100%; max-height: 200px; overflow-y: auto; text-align: left; background: #f8fafc; padding: 16px; border-radius: 14px; margin-bottom: 10px; border: 1px solid #f1f5f9;">
                             ${card.example ? `
-                                <div style="margin-bottom: 8px;">
-                                    <span style="font-weight: 600; color: #1e293b;">🇬🇧 ${card.example}</span> 
-                                    <span style="cursor: pointer; color: #4f46e5; margin-left: 4px;" onclick="event.stopPropagation(); speakText('en', '${escapeJS(card.example)}')">🔊</span>
+                                <div style="margin-bottom: 10px;">
+                                    <div style="font-weight: 700; color: #4f46e5; font-size: 1.05rem; margin-bottom: 2px;">🇬🇧 ${card.example}</div>
+                                    <span style="cursor: pointer; color: #4470ff; font-size: 1.05rem;" onclick="event.stopPropagation(); speakText('en', '${escapeJS(card.example)}')">🔊 Nghe</span>
                                 </div>
                             ` : ''}
                             ${card.example_zh ? `
-                                <div style="margin-bottom: 8px;">
-                                    <span style="font-weight: 600; color: #1e293b;">🇨🇳 ${card.example_zh}</span> 
-                                    <span style="cursor: pointer; color: #4f46e5; margin-left: 4px;" onclick="event.stopPropagation(); speakText('zh', '${escapeJS(card.example_zh)}')">🔊</span>
+                                <div style="margin-bottom: 10px;">
+                                    <div style="font-weight: 700; color: #ea580c; font-size: 1.05rem; margin-bottom: 2px;">🇨🇳 ${card.example_zh}</div>
+                                    <span style="cursor: pointer; color: #4470ff; font-size: 1.05rem;" onclick="event.stopPropagation(); speakText('zh', '${escapeJS(card.example_zh)}')">🔊 听</span>
                                 </div>
                             ` : ''}
-                            ${card.example_vi ? `<div style="color: #64748b; font-size: 0.95rem; border-top: 1px solid #e2e8f0; padding-top: 8px; margin-top: 4px;">🇻🇳 ${card.example_vi}</div>` : ''}
+                            ${card.example_vi ? `<div style="color: #64748b; font-size: 0.95rem; border-top: 1px solid #e2e8f0; padding-top: 8px; margin-top: 4px;">🇻🇳 ${card.example_vi}</div>` : ``}
                         </div>
                         
                         <div style="display: flex; gap: 10px; width: 100%; margin-bottom: 10px;">
@@ -463,29 +472,41 @@ window.generateBatchCards = async function() {
 
 window.renderManageCards = async function() {
     try {
-        let res = await apiFetch('/words/today'); 
+        let res = await apiFetch('/words/manage');
+        if (!res.ok) throw new Error("Error");
         let data = await res.json();
-        let cards = data.words || [];
+        let cards = data || [];
         let searchTerm = document.getElementById('manageSearch').value.toLowerCase();
         let container = document.getElementById('manageCardsContainer');
         container.innerHTML = '';
-        let filtered = cards.filter(c => c.word.toLowerCase().includes(searchTerm) || (c.word_en && c.word_en.toLowerCase().includes(searchTerm)));
+        let filtered = cards.filter(c => 
+            c.word.toLowerCase().includes(searchTerm) || 
+            (c.word_en && c.word_en.toLowerCase().includes(searchTerm)) ||
+            (c.word_zh && c.word_zh.includes(searchTerm))
+        );
         filtered.forEach(c => {
             let cardDiv = document.createElement('div');
             cardDiv.className = 'ai-box';
             cardDiv.style.position = 'relative';
             let badgeClass = `badge badge-${c.mode || 'en'}`;
-            let modeText = c.mode === 'trilingual' ? '3 Ngôn ngữ' : (c.mode === 'zh' ? 'Tiếng Trung' : 'Tiếng Anh');
+            let modeText = c.mode === 'trilingual' ? '🌍 3 Ngôn ngữ' : (c.mode === 'zh' ? '🇨🇳 Tiếng Trung' : '🇬🇧 Tiếng Anh');
+            let pinyinRaw = (c.pinyin || '').trim();
+            let pinyinDisplay = (pinyinRaw && !pinyinRaw.startsWith('[')) ? pinyinRaw : '';
+            let pinyinLine = pinyinDisplay ? `<div style="color: #ea580c; font-size: 12px; margin-bottom: 5px; margin-top: 3px;">📖 [ ${pinyinDisplay} ]</div>` : '';
             cardDiv.innerHTML = `
-                <div class="${badgeClass}">${modeText}</div>
-                <div style="font-weight: 700; color: #1e293b; margin-bottom: 5px;">${c.word_en ? '🇬🇧 '+c.word_en : c.word}</div>
-                <div style="color: #64748b; font-size: 12px; margin-bottom: 8px;">${c.word_zh ? '🇨🇳 '+c.word_zh : ''}</div>
-                <div style="color: #475569; font-size: 13px;">🇻🇳 ${c.meaning}</div>
-                <button onclick="deleteCardDirect(${c.id})" style="position: absolute; top: 10px; right: 10px; background: none; border: none; cursor: pointer; color: #ef4444; font-size: 1.1rem;">🗑️</button>
+                <span class="${badgeClass}">${modeText}</span>
+                <div style="font-weight: 700; color: #1e293b; margin-bottom: 2px;">
+                    ${c.word_en ? '🇬🇧 '+c.word_en : '📝 '+c.word}${c.word_zh ? `<br>🇨🇳 ${c.word_zh}` : ''}
+                </div>
+                ${pinyinLine}
+                ${c.pronunciation ? `<div style="color: #64748b; font-size: 11px; margin-bottom: 5px;">IPA: ${c.pronunciation}</div>` : ''}
+                <div style="color: #475569; font-size: 13px;">Nghĩa: ${c.meaning}</div>
+                ${c.example_vi ? `<div style="color: #94a3b8; font-size: 11px; margin-top: 5px;">VD: ${c.example_vi}</div>` : ''}
+                <button onclick="deleteCardDirect(${c.id})" style="position: absolute; top: 10px; right: 10px; background: none; border: none; cursor: pointer; color: #ef4444; font-size: 1.1rem;" title="Xóa thẻ">🗑️</button>
             `;
             container.appendChild(cardDiv);
         });
-    } catch(e) {}
+    } catch(e) { console.error(e); }
 }
 
 window.deleteCardDirect = async function(id) {
@@ -634,33 +655,42 @@ window.checkExercise = async function(vocab_id) {
     } catch(e) {}
 }
 
-// Role-play conversation scenarios
-let scenarioFiles = {
-    'interview_junior': 'Phỏng vấn IT - Junior Developer',
-    'daily_standup': 'Daily Standup Meeting'
-};
+// Role-play conversation scenarios — loaded dynamically from backend endpoints
+let allScenarioFiles = [];
 
 window.loadScenarios = function() {
     let container = document.getElementById('scenariosContainer');
     if (!container) return;
-    container.innerHTML = '';
-    for (let key in scenarioFiles) {
-        let div = document.createElement('div');
-        div.className = 'ai-box';
-        div.style.cursor = 'pointer';
-        div.innerHTML = `<h4>${scenarioFiles[key]}</h4><p style="color:#64748b; font-size:0.9rem;">Practice IT English conversations</p>`;
-        div.onclick = () => startRolePlay(key);
-        container.appendChild(div);
-    }
+    container.innerHTML = '<p style="color:#64748b;">Đang tải danh sách scenario...</p>';
+    apiFetch('/scenarios/list')
+    .then(res => res.json())
+    .then(data => {
+        allScenarioFiles = data.scenarios || [];
+        container.innerHTML = '';
+        if (allScenarioFiles.length === 0) {
+            container.innerHTML = '<p style="color:#64748b;">Chưa có scenario nào.</p>';
+            return;
+        }
+        allScenarioFiles.forEach(s => {
+            let div = document.createElement('div');
+            div.className = 'ai-box';
+            div.style.cursor = 'pointer';
+            div.innerHTML = `<h4>${s.name}</h4><p style="color:#64748b; font-size:0.9rem;">Practice IT English conversations</p>`;
+            div.onclick = () => startRolePlay(s.key);
+            container.appendChild(div);
+        });
+    })
+    .catch(() => {
+        container.innerHTML = '<p style="color:#ef4444;">Không tải được danh sách scenario.</p>';
+    });
 }
-
-let currentScenarioLines = [];
-let currentLineIndex = 0;
 
 window.startRolePlay = async function(scenarioKey) {
     showLoading();
+    let filename = (scenarioKey.endsWith('.txt') ? scenarioKey : scenarioKey + '.txt');
     try {
-        let res = await fetch(`/js/scenarios/it/${scenarioKey}.txt`);
+        let res = await apiFetch(`/scenarios/it/${encodeURIComponent(filename)}`);
+        if (!res.ok) throw new Error("Scenario not found");
         let text = await res.text();
         currentScenarioLines = text.split('\n').filter(l => l.trim());
         currentLineIndex = 0;
@@ -670,7 +700,7 @@ window.startRolePlay = async function(scenarioKey) {
         
         nextScenarioLine();
     } catch(e) {
-        showToast('Không tải được đoạn hội thoại');
+        showToast('Không tải được đoạn hội thoại: ' + scenarioKey);
     }
     hideLoading();
 }

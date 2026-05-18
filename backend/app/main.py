@@ -1,5 +1,6 @@
 from fastapi import FastAPI, Depends, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import FileResponse, PlainTextResponse
 from sqlalchemy.orm import Session
 from datetime import datetime, date, timedelta
 from typing import List
@@ -8,6 +9,7 @@ import jwt
 import requests
 import urllib.parse
 import bcrypt
+import os
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 
 from .database import get_db, init_db
@@ -429,9 +431,41 @@ def generate_conversation(words: List[str]):
 
 @app.get("/words/all")
 def get_all_words(user_id: int = Depends(get_user_id), db: Session = Depends(get_db)):
-    
+    """Lấy toàn bộ từ đã học (cho trang Quản lý) - Không lọc theo mode, không giới hạn"""
     words = db.query(Vocabulary).all()
     return [{"id": w.id, "word": w.word, "meaning": w.meaning} for w in words]
+
+
+@app.get("/words/manage")
+def get_manage_words(user_id: int = Depends(get_user_id), db: Session = Depends(get_db)):
+    """Trả về toàn bộ thẻ người dùng đã học kèm đầy đủ dữ liệu (cho trang Quản lý)"""
+    from sqlalchemy.orm import aliased
+    words = db.query(Vocabulary).join(
+        UserLearning, UserLearning.vocab_id == Vocabulary.id
+    ).filter(
+        UserLearning.user_id == user_id
+    ).all()
+    
+    result = []
+    for w in words:
+        result.append({
+            "id": w.id,
+            "word": w.word,
+            "word_en": w.word_en or "",
+            "word_zh": w.word_zh or "",
+            "pinyin": w.pinyin or "",
+            "meaning": w.meaning or "",
+            "pronunciation": w.pronunciation or "",
+            "mode": w.mode or "en",
+            "example": w.example or "",
+            "example_zh": w.example_zh or "",
+            "example_vi": w.example_vi or "",
+            "conversation": w.conversation or "",
+            "cloze_text": w.cloze_text or "",
+            "image_url": w.image_url or "",
+            "group_id": w.group_id
+        })
+    return result
 
 @app.post("/user/settings")
 def update_settings(daily_goal: int, profession: str = "Công nghệ thông tin (IT)", learning_language: str = "en", user_id: int = Depends(get_user_id), db: Session = Depends(get_db)):
@@ -503,6 +537,55 @@ def ai_chat(req: ChatRequest):
         return {"response": resp.json().get("response", "Lỗi AI")}
     except:
         return {"response": "Không kết nối được AI Ollama"}
+
+# ─── Scenarios & Conversations ───────────────────────────────────────────────
+
+SCENARIOS_DIR = os.path.join(os.path.dirname(os.path.dirname(__file__)), "scenarios")
+CONVERSATIONS_DIR = os.path.join(SCENARIOS_DIR, "conversations")
+os.makedirs(CONVERSATIONS_DIR, exist_ok=True)
+
+@app.get("/scenarios/list")
+def list_scenarios():
+    """Liệt kê tất cả scenario/role-play files trong thư mục"""
+    it_dir = os.path.join(SCENARIOS_DIR, "it")
+    if not os.path.isdir(it_dir):
+        return {"scenarios": []}
+    files = sorted(f for f in os.listdir(it_dir) if f.endswith(".txt"))
+    return {
+        "scenarios": [
+            {
+                "key": f.replace(".txt", ""),
+                "name": f.replace(".txt", "").replace("_", " ").title(),
+                "path": f"/scenarios/it/{f}"
+            }
+            for f in files
+        ]
+    }
+
+@app.get("/scenarios/it/{filename}")
+def get_scenario_file(filename: str):
+    """Đọc file scenario/role-play từ thư mục"""
+    filepath = os.path.join(SCENARIOS_DIR, "it", filename)
+    if not os.path.isfile(filepath):
+        raise HTTPException(404, "Không tìm thấy scenario")
+    return FileResponse(filepath, media_type="text/plain")
+
+@app.get("/conversations/list")
+def list_conversations(user_id: int = Depends(get_user_id)):
+    """Liệt kê file hội thoại đã lưu của người dùng"""
+    if not os.path.isdir(CONVERSATIONS_DIR):
+        return {"conversations": []}
+    files = sorted(os.listdir(CONVERSATIONS_DIR))
+    return {"conversations": files}
+
+@app.get("/conversations/{filename}")
+def get_conversation_file(filename: str):
+    """Đọc file hội thoại đã lưu"""
+    filepath = os.path.join(CONVERSATIONS_DIR, filename)
+    if not os.path.isfile(filepath):
+        raise HTTPException(404, "Không tìm thấy hội thoại")
+    return FileResponse(filepath, media_type="text/plain")
+
 
 if __name__ == "__main__":
     import uvicorn
