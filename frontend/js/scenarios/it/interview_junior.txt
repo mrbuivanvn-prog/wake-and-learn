@@ -1,0 +1,15 @@
+IT Interview Practice - Junior Developer
+
+[AI] Interviewer: Chào bạn, cảm ơn đã đến phỏng vấn hôm nay. Bạn có thể tự giới thiệu về bản thân và kinh nghiệm lập trình của mình không?
+
+[User]: 
+
+[AI] Interviewer: Tôi thấy bạn đã có kinh nghiệm với JavaScript. Hãy giải thích sự khác nhau giữa var, let và const trong ES6?
+
+[User]:
+
+[AI] Interviewer: Tốt! Bây giờ, bạn sẽ xử lý asynchronous operations như thế nào trong Node.js? Hãy nêu ít nhất 2 cách.
+
+[User]:
+
+[AI] Interviewer: Câu hỏi cuối cùng - bạn sẽ debug một ứng dụng chậm khi số lượng request tăng lên như thế nào?

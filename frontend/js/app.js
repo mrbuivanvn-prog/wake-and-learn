@@ -172,6 +172,7 @@ window.showTab = function(tabId) {
     if (tabId === 'study') loadStudyCards();
     if (tabId === 'manage') renderManageCards();
     if (tabId === 'exercises') loadExercises();
+    if (tabId === 'scenarios') loadScenarios();
 };
 
 function setupTabs() {
@@ -631,4 +632,82 @@ window.checkExercise = async function(vocab_id) {
         }
         loadStats();
     } catch(e) {}
+}
+
+// Role-play conversation scenarios
+let scenarioFiles = {
+    'interview_junior': 'Phỏng vấn IT - Junior Developer',
+    'daily_standup': 'Daily Standup Meeting'
+};
+
+window.loadScenarios = function() {
+    let container = document.getElementById('scenariosContainer');
+    if (!container) return;
+    container.innerHTML = '';
+    for (let key in scenarioFiles) {
+        let div = document.createElement('div');
+        div.className = 'ai-box';
+        div.style.cursor = 'pointer';
+        div.innerHTML = `<h4>${scenarioFiles[key]}</h4><p style="color:#64748b; font-size:0.9rem;">Practice IT English conversations</p>`;
+        div.onclick = () => startRolePlay(key);
+        container.appendChild(div);
+    }
+}
+
+let currentScenarioLines = [];
+let currentLineIndex = 0;
+
+window.startRolePlay = async function(scenarioKey) {
+    showLoading();
+    try {
+        let res = await fetch(`/js/scenarios/it/${scenarioKey}.txt`);
+        let text = await res.text();
+        currentScenarioLines = text.split('\n').filter(l => l.trim());
+        currentLineIndex = 0;
+        
+        let modal = document.getElementById('rolePlayModal');
+        if (modal) modal.style.display = 'flex';
+        
+        nextScenarioLine();
+    } catch(e) {
+        showToast('Không tải được đoạn hội thoại');
+    }
+    hideLoading();
+}
+
+window.nextScenarioLine = function() {
+    let dialog = document.getElementById('rolePlayDialog');
+    if (currentLineIndex >= currentScenarioLines.length) {
+        dialog.innerHTML += '<p style="color:#16a34a; font-weight:bold;">🎉 Hoàn thành role-play!</p>';
+        return;
+    }
+    
+    let line = currentScenarioLines[currentLineIndex];
+    let speaker = line.includes('[AI]') ? 'AI' : 'User';
+    let text = line.replace(/\[AI\]|\[User\]:?/g, '').trim();
+    
+    dialog.innerHTML += `<div style="margin:10px 0; ${speaker==='AI'?'color:#4f46e5;':'color:#1e293b;'}"><strong>${speaker === 'AI' ? '🤖 AI' : 'Bạn'}:</strong> ${text}</div>`;
+    
+    if (speaker === 'AI') {
+        speakText('en', text);
+    }
+    
+    dialog.scrollTop = dialog.scrollHeight;
+    currentLineIndex++;
+    
+    if (speaker === 'User') {
+        let input = document.getElementById('rolePlayInput');
+        if (input) {
+            input.style.display = 'flex';
+            input.focus();
+        }
+    }
+}
+
+window.endRolePlay = function() {
+    document.getElementById('rolePlayModal').style.display = 'none';
+    document.getElementById('rolePlayDialog').innerHTML = '';
+    document.getElementById('rolePlayInput').style.display = 'none';
+    currentScenarioLines = [];
+    currentLineIndex = 0;
 }

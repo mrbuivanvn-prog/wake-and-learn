@@ -1,0 +1,19 @@
+IT Workplace English - Daily Standup
+
+[AI] Team Lead: Chào buổi sáng team! Hôm nay chúng ta bắt đầu standup meeting. Mọi người đều sẵn sàng chưa?
+
+[User]:
+
+[AI] Team Lead: Tuyết, bạn làm gì hôm nay?
+
+[User]:
+
+[AI] Team Lead: Tôi đang làm API authentication module. Đã hoàn thành 70% rồi, dự kiến mai nộp. Có vấn đề gì với API integration không?
+
+[User]:
+
+[AI] Team Lead: Tốt! Nam bạn làm gì?
+
+[User]:
+
+[AI] Team Lead: Cảm ơn mọi người. Nếu ai cần help thì cứ ping tôi nhé. Meeting adjourned!

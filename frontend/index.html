@@ -46,6 +46,10 @@
                     <span class="icon">✍️</span>
                     <span>Bài tập điền từ</span>
                 </div>
+                <div class="nav-link" data-tab="scenarios">
+                    <span class="icon">🎭</span>
+                    <span>Role-play IT</span>
+                </div>
                 <div class="nav-link" data-tab="settings">
                     <span class="icon">⚙️</span>
                     <span>Cấu hình</span>
@@ -231,10 +235,32 @@
                 <button class="btn btn-primary" onclick="loadExercises()">🔄 Tải câu hỏi mới</button>
                 <div id="exercisesContainer" style="margin-top: 20px;"></div>
             </div>
+
+            <!-- Scenarios Tab -->
+            <div class="tab" id="scenarios">
+                <h2>🎭 Role-play Conversation</h2>
+                <p>Luyện nói tiếng Anh qua các tình huống thực tế trong môi trường IT.</p>
+                <div id="scenariosContainer" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 15px;">
+                    <!-- Scenarios will be loaded here -->
+                </div>
+            </div>
         </main>
     </div>
 
     <div id="toast" class="toast"></div>
+
+    <!-- Role-play Modal -->
+    <div id="rolePlayModal" class="login-overlay" style="display: none;">
+        <div class="login-card" style="max-width: 600px; max-height: 80vh; display: flex; flex-direction: column;">
+            <h3 style="margin-top: 0;">🎭 Role-play Conversation</h3>
+            <div id="rolePlayDialog" style="flex: 1; overflow-y: auto; margin-bottom: 15px; padding: 10px; background: #f8fafc; border-radius: 8px;"></div>
+            <div id="rolePlayInput" style="display: none; gap: 10px; margin-top: 10px;">
+                <input type="text" id="rolePlayUserText" placeholder="Nhập câu trả lời của bạn..." style="flex: 1; padding: 10px; border-radius: 8px; border: 1px solid #ddd;">
+                <button class="btn btn-primary" onclick="document.getElementById('rolePlayDialog').innerHTML += '<div style=&quot;margin:10px 0;color:#1e293b&quot;><strong>Bạn:</strong> ' + document.getElementById('rolePlayUserText').value + '</div>'; document.getElementById('rolePlayUserText').value=''; nextScenarioLine()">Gửi</button>
+            </div>
+            <button class="btn" onclick="endRolePlay()" style="margin-top: 15px;">Kết thúc</button>
+        </div>
+    </div>
 
     <!-- Gift Overlay -->
     <div id="giftOverlay" class="login-overlay">
