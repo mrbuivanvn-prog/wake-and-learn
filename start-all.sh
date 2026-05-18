@@ -23,7 +23,7 @@ cd $PROJECT_DIR
 echo -e "${YELLOW}📌 Dừng các process cũ...${NC}"
 pkill -9 -f uvicorn 2>/dev/null
 pkill -9 -f "http.server" 2>/dev/null
-pkill -9 -f python3 2>/dev/null
+# pkill -9 -f python3 2>/dev/null
 fuser -k 8000/tcp 2>/dev/null
 fuser -k 3000/tcp 2>/dev/null
 sleep 2
