@@ -126,11 +126,16 @@ YÊU CẦU BẮT BUỘC:
                     elif line.startswith("VI:"):
                         vi = line[3:].strip()
                 if en and vi:
+                    # For Chinese mode, return zh key for the example
+                    if lang == "zh":
+                        return {"zh": en, "vi": vi}
                     return {"en": en, "vi": vi}
         except Exception as e:
             print(f"AI example error: {e}")
         
         # Fallback
+        if lang == "zh":
+            return {"zh": f"这是使用'{word}'的例子。", "vi": f"Đây là ví dụ sử dụng '{meaning}'."}
         return {"en": f"This is an example using '{word}'.", "vi": f"Đây là ví dụ sử dụng '{meaning}'."}
     
     def cloze(self, word: str, example: str, lang: str = "en") -> str:
@@ -158,5 +163,28 @@ YÊU CẦU BẮT BUỘC:
             print(f"AI conversation error: {e}")
         
         return f"A: What does '{word}' mean?\nB: Let me explain with an example.\nA: I understand now!"
+    
+    def get_phonetics(self, word: str, lang: str = "en") -> str:
+        """Tự động tạo Pinyin (cho tiếng Trung) hoặc phiên âm IPA (cho tiếng Anh)"""
+        try:
+            if lang == "zh":
+                prompt = f"Hãy cung cấp duy nhất Pinyin có dấu thanh (tone marks) cho từ tiếng Trung '{word}'. Chỉ trả về chuỗi pinyin, không kèm bất kỳ giải thích nào khác."
+            else:
+                prompt = f"Hãy cung cấp phiên âm IPA quốc tế chuẩn Anh-Mỹ (IPA) cho từ tiếng Anh '{word}'. Ví dụ: /həˈloʊ/. Chỉ trả về chuỗi phiên âm nằm trong dấu gạch chéo /.../, không giải thích."
+            
+            resp = requests.post(self.ollama_url, json={
+                "model": "qwen2.5:3b",
+                "prompt": prompt,
+                "stream": False,
+                "options": { "temperature": 0 }
+            }, timeout=10)
+            if resp.status_code == 200:
+                return resp.json().get("response", "").strip()
+        except Exception as e:
+            print(f"AI get_phonetics error: {e}")
+        # Fallback: simple approximation
+        if lang == "zh":
+            return f"[{word}]"  # Return word in brackets as basic pinyin fallback
+        return f"/{word}/"  # Fallback IPA for English
 
 ai_service = AIService()
