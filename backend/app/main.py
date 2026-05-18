@@ -99,7 +99,12 @@ def register(req: LoginRequest, db: Session = Depends(get_db)):
 def add_words_batch_ai(req: BatchWordRequest, user_id: int = Depends(get_user_id), db: Session = Depends(get_db)):
     """Thêm nhiều từ - AI tự động dịch và tạo nội dung"""
     
-    group_name = "Default_ZH" if req.language == "zh" else "Default_EN"
+    # Determine group name based on actual language, not just zh vs en
+    if req.language == "zh":
+        group_name = "Default_ZH"
+    else:
+        group_name = "Default_EN"
+    
     group = db.query(VocabularyGroup).filter(VocabularyGroup.name == group_name, VocabularyGroup.created_by_user == False).first()
     if not group:
         group = VocabularyGroup(name=group_name, language=req.language, profession="general")
@@ -120,12 +125,15 @@ def add_words_batch_ai(req: BatchWordRequest, user_id: int = Depends(get_user_id
         # CẤU HÌNH THÔNG MINH: Tự động khởi tạo nếu người dùng chưa chọn mục tiêu
         settings = db.query(UserSettings).filter(UserSettings.user_id == user_id).first()
         if not settings:
-            settings = UserSettings(user_id=user_id, daily_goal=5, profession="Tổng quát", learning_language="en")
+            settings = UserSettings(user_id=user_id, daily_goal=5, profession="Tổng quát", learning_language=req.language)
             db.add(settings)
             db.flush()
             
-        mode = settings.learning_language
-        profession = settings.profession
+        mode = settings.learning_language if settings.learning_language else req.language
+        profession = settings.profession if settings.profession else "Tổng quát"
+        
+        pinyin = ""
+        pronunciation = ""
         
         if mode == "trilingual":
             # CHẾ ĐỘ 3 NGÔN NGỮ (EN - ZH - VI) - Prompt cực kỳ nghiêm ngặt
@@ -134,6 +142,9 @@ def add_words_batch_ai(req: BatchWordRequest, user_id: int = Depends(get_user_id
             word_zh = data.get("zh", word)
             pinyin = data.get("pinyin", "")
             meaning = data.get("vi", word)
+            
+            # Fetch English IPA
+            pronunciation = ai_service.get_phonetics(word_en, lang="en")
             
             # BẮT BUỘC AI phải dùng đúng từ trong câu ví dụ để bài tập điền từ hoạt động
             ex_data = ai_service.example_trilingual(word_en, word_zh, meaning, profession=profession)
@@ -149,16 +160,18 @@ def add_words_batch_ai(req: BatchWordRequest, user_id: int = Depends(get_user_id
             conversation = f"EN: {example_en}\nZH: {example_zh}\nVI: {example_vi}"
         elif mode == "zh":
             # CHẾ ĐỘ TIẾNG TRUNG - VIỆT (ZH - VI)
+            # Translate the word to get Chinese meaning
             meaning = ai_service.translate(word, lang="zh", profession=profession)
             example_data = ai_service.example(word, meaning, lang="zh", profession=profession)
-            cloze_text = ai_service.cloze(word, example_data["en"], lang="zh")
-            conversation = ai_service.conversation(word, lang="zh", profession=profession)
+            cloze_text = ai_service.cloze(word, example_data.get("zh", ""), lang="zh")
+            word_zh = word  # The input word IS the Chinese word
+            pinyin = ai_service.get_phonetics(word, lang="zh")
+            pronunciation = pinyin
             word_en = ""
-            word_zh = word
-            pinyin = "" # Thường AI trả về kèm Pinyin trong meaning hoặc ví dụ
             example_en = ""
-            example_zh = example_data["en"]
-            example_vi = example_data["vi"]
+            example_zh = example_data.get("zh", "")
+            example_vi = example_data.get("vi", "")
+            conversation = ai_service.conversation(word, lang="zh", profession=profession)
         else:
             # CHẾ ĐỘ TIẾNG ANH - VIỆT (EN - VI)
             meaning = ai_service.translate(word, lang="en", profession=profession)
@@ -168,12 +181,12 @@ def add_words_batch_ai(req: BatchWordRequest, user_id: int = Depends(get_user_id
             word_en = word
             word_zh = ""
             pinyin = ""
+            pronunciation = ai_service.get_phonetics(word, lang="en")
             example_en = example_data["en"]
             example_zh = ""
             example_vi = example_data["vi"]
 
-        import urllib.parse
-        image_prompt = urllib.parse.quote(f"cute cartoon illustration of {word}, vibrant colors, simple, white background")
+        image_prompt = urllib.parse.quote(f"cute 3D render of {word}, modern simple professional style, white background")
         image_url = f"https://image.pollinations.ai/prompt/{image_prompt}?width=400&height=400&nologo=true"
         
         vocab = Vocabulary(
@@ -183,10 +196,10 @@ def add_words_batch_ai(req: BatchWordRequest, user_id: int = Depends(get_user_id
             word_zh=word_zh,
             pinyin=pinyin,
             meaning=meaning,
-            pronunciation=pinyin if pinyin else f"/{word}/",
-            mode=mode, # LƯU CHẾ ĐỘ BẮT BUỘC
+            pronunciation=pronunciation if pronunciation else f"/{word}/",
+            mode=mode,
             level="A1",
-            example=example_en if mode != "zh" else example_zh,
+            example=example_en if mode not in ["zh", "trilingual"] else example_zh,
             example_zh=example_zh,
             example_vi=example_vi,
             conversation=conversation,
