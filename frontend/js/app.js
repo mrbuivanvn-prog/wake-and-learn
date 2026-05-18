@@ -181,10 +181,41 @@ window.loadStudyCards = async function() {
         dueCards = data.words || [];
         
         if (dueCards.length === 0) {
+            // Play a warm, relaxing major chord sequence using Web Audio API
+            try {
+                let ctx = new (window.AudioContext || window.webkitAudioContext)();
+                let playNote = (freq, startTime, duration) => {
+                    let osc = ctx.createOscillator();
+                    let gain = ctx.createGain();
+                    osc.connect(gain);
+                    gain.connect(ctx.destination);
+                    osc.type = 'sine';
+                    osc.frequency.value = freq;
+                    gain.gain.setValueAtTime(0, ctx.currentTime + startTime);
+                    gain.gain.linearRampToValueAtTime(0.12, ctx.currentTime + startTime + 0.15);
+                    gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + startTime + duration);
+                    osc.start(ctx.currentTime + startTime);
+                    osc.stop(ctx.currentTime + startTime + duration);
+                };
+                playNote(261.63, 0, 2.5); // C4
+                playNote(329.63, 0.15, 2.5); // E4
+                playNote(392.00, 0.3, 2.5); // G4
+                playNote(523.25, 0.45, 3.5); // C5
+            } catch(e) {}
+
+            // Trigger beautiful celebration confetti
+            if (typeof confetti === 'function') {
+                confetti({ particleCount: 120, spread: 80, origin: { y: 0.6 } });
+            }
+
             document.getElementById('studyContent').innerHTML = `
-                <div class="ai-box" style="text-align: center; padding: 2rem;">
-                    <p style="font-size: 1.1rem; margin-bottom: 1.5rem;">🎉 Hiện không có thẻ nào khớp với mục tiêu học của bạn. <br>Hãy tạo thẻ mới hoặc đổi lại <strong>Cấu hình</strong>!</p>
-                    <button class="btn btn-primary" onclick="showTab('create')">➕ Tạo thẻ mới</button>
+                <div class="ai-box" style="text-align: center; padding: 2.5rem; border-radius: 28px;">
+                    <h2 style="color: #10b981; margin-bottom: 1rem; font-size: 2rem;">🎉 Tuyệt vời!</h2>
+                    <p style="font-size: 1.15rem; margin-bottom: 1.8rem; line-height: 1.6; color: #475569;">
+                        Bạn đã hoàn thành toàn bộ các thẻ học ngày hôm nay! <br>
+                        Hãy thư giãn đầu óc một chút trước khi tiếp tục nhé. ✨
+                    </p>
+                    <button class="btn btn-primary" onclick="showTab('create')">➕ Tạo thêm thẻ mới</button>
                 </div>
             `;
             return;
@@ -196,7 +227,7 @@ window.loadStudyCards = async function() {
     }
 }
 
-function showStudyCard() {
+window.showStudyCard = function() {
     if (currentCardIndex >= dueCards.length) {
         loadStudyCards();
         return;
@@ -204,37 +235,122 @@ function showStudyCard() {
     let card = dueCards[currentCardIndex];
     let langCode = card.language || 'en';
     let flag = langCode === 'zh' ? '🇨🇳' : '🇬🇧';
-    let audioText = langCode === 'zh' ? '🔊 Nghe tiếng Trung' : '🔊 Nghe tiếng Anh';
+    let audioText = '🔊 Nghe';
     let imgKeyword = card.word_en || card.word;
-    let wordClean = imgKeyword ? imgKeyword.trim().toLowerCase().replace(/[^\\w\\s]/gi, '') : "object";
-    let prof = document.getElementById('settingProfession').value || 'general';
+    let wordClean = imgKeyword ? imgKeyword.trim().toLowerCase().replace(/[^\w\s]/gi, '') : "object";
+    
+    // Translate profession nicely to Vietnamese for user aesthetic
+    let rawProf = document.getElementById('settingProfession').value || 'general';
+    let profTranslation = {
+        'general': 'Đại cương / Tổng quát',
+        'it': 'Công nghệ thông tin (IT)',
+        'business': 'Kinh doanh & Thương mại',
+        'medical': 'Y học & Chăm sóc sức khỏe',
+        'engineering': 'Kỹ thuật & Công nghệ'
+    };
+    let profText = profTranslation[rawProf.toLowerCase()] || rawProf;
+
     let seed = Math.floor(Math.random() * 1000);
-    let imgUrl = `https://image.pollinations.ai/prompt/professional%20clean%203D%20render%20of%20${encodeURIComponent(wordClean)}%20related%20to%20${encodeURIComponent(prof)},%20modern%20style,%20white%20background?width=400&height=400&seed=${seed}`;
+    let imgUrl = `https://image.pollinations.ai/prompt/professional%20clean%203D%20render%20of%20${encodeURIComponent(wordClean)}%20related%20to%20${encodeURIComponent(rawProf)},%20modern%20style,%20white%20background?width=400&height=400&seed=${seed}`;
+
+    let phoneticsHtml = '';
+    // Determine if this is a Chinese, English, or trilingual card
+    let isChinese = card.word_zh && !card.word_en;
+    let isTrilingual = card.word_en && card.word_zh;
+    let isEnglish = !card.word_zh && card.word_en;
+    
+    if (isTrilingual) {
+        phoneticsHtml = `
+            <div style="font-size: 1.15rem; color: #475569; margin-bottom: 12px; font-weight: 500;">
+                ${card.pronunciation ? `🇬🇧 <span style="font-family: 'Outfit', sans-serif; color: #4f46e5;">${card.pronunciation}</span>` : ''}
+                ${card.pinyin ? ` &nbsp; 🇨🇳 <span style="color: #ea580c; font-weight: 600;">[ ${card.pinyin} ]</span>` : ''}
+            </div>
+        `;
+    } else if (isChinese) {
+        phoneticsHtml = `
+            <div style="font-size: 1.15rem; color: #ea580c; margin-bottom: 12px; font-weight: 600;">
+                🇨🇳 [ ${card.pinyin || card.word} ]
+            </div>
+        `;
+    } else {
+        phoneticsHtml = `
+            <div style="font-size: 1.15rem; color: #4f46e5; margin-bottom: 12px; font-weight: 500; font-family: 'Outfit', sans-serif;">
+                🇬🇧 ${card.pronunciation || `/${card.word}/`}
+            </div>
+        `;
+    }
 
     let html = `
         <div class="flashcard-container">
-            <div class="flashcard" id="studyFlashcard" style="height: 520px;">
+            <div class="flashcard" id="studyFlashcard" style="height: 520px;" onclick="this.classList.toggle('flipped')">
                 <div class="flashcard-inner">
-                    <div class="flashcard-front">
-                        <img src="${imgUrl}" class="flashcard-image" alt="Visual" onerror="this.onerror=null; this.src='https://img.icons8.com/color/200/${wordClean}.png';">
-                        <div class="card-text" style="color: #000; font-weight: bold; font-size: 1.5rem;">
+                    <!-- MẶT TRƯỚC -->
+                    <div class="flashcard-front" style="position: relative;">
+                        <!-- Chuyên ngành tag -->
+                        <div style="position: absolute; top: 18px; left: 18px;">
+                            <span class="badge" style="background: rgba(99, 102, 241, 0.1); color: #4f46e5; border: 1px solid rgba(99, 102, 241, 0.2); font-size: 11px; padding: 6px 12px; border-radius: 12px;">
+                                🎓 Chuyên ngành: ${profText}
+                            </span>
+                        </div>
+                        
+                        <!-- Image Container with Smooth Shimmer Loading -->
+                        <div style="position: relative; width: 140px; height: 140px; margin-bottom: 15px; margin-top: 2rem;">
+                            <div class="image-skeleton" style="position: absolute; top:0; left:0; width:100%; height:100%; border-radius:50%; background: linear-gradient(90deg, #f3f4f6 25%, #e5e7eb 50%, #f3f4f6 75%); background-size: 200% 100%; animation: shimmer 1.5s infinite; border: 5px solid #f3f4f6;"></div>
+                            <img src="${imgUrl}" class="flashcard-image" alt="Visual" 
+                                 onload="this.style.opacity=1; this.previousElementSibling.style.display='none';" 
+                                 onerror="this.onerror=null; this.src='https://img.icons8.com/color/200/${wordClean}.png'; this.previousElementSibling.style.display='none';"
+                                 style="opacity: 0; transition: opacity 0.3s; margin-top: 0; position: absolute; top:0; left:0; width:100%; height:100%; z-index: 2;">
+                        </div>
+                        
+                        <div class="card-text" style="color: #000; font-weight: bold; font-size: 1.8rem; margin-top: 1rem;">
                             ${card.word_en && card.word_zh ? `<span>🇬🇧 ${card.word_en}</span><br><span>🇨🇳 ${card.word_zh}</span>` : `${flag} ${card.word}`}
                         </div>
-                        <div style="font-size: 1rem; color: #333; margin-bottom: 5px;">${card.pinyin || card.pronunciation}</div>
-                        <div style="font-size: 1rem; color: #555; font-style: italic; margin-bottom: 15px; padding: 0 10px;">
-                            "${card.example || ""}"
-                            <span style="cursor: pointer;" onclick="speakText('${langCode}', '${escapeJS(card.example)}')">🔊</span>
+                        
+                        <!-- Hiển thị ví dụ gốc để học viên liên tưởng trước -->
+                        <div style="margin-top: 1rem; padding: 0 10px; text-align: center; width: 100%;">
+                            ${card.example ? `<div style="font-size: 0.95rem; color: #475569; font-style: italic; line-height: 1.4;">"${card.example}"</div>` : ''}
+                            ${card.example_zh ? `<div style="font-size: 0.95rem; color: #475569; font-style: italic; line-height: 1.4; margin-top: 5px;">"${card.example_zh}"</div>` : ''}
                         </div>
-                        <button class="audio-btn" onclick="speakText('${langCode}', '${escapeJS(card.word)}')">${audioText}</button>
-                        <div class="rating-buttons">
-                            <button class="rating-btn hard" onclick="rateCard(0)">😫 Khó</button>
-                            <button class="rating-btn medium" onclick="rateCard(1)">😊 Tạm</button>
-                            <button class="rating-btn easy" onclick="rateCard(2)">🎉 Dễ</button>
+                        
+                        <p style="color: #64748b; margin-top: auto; font-size: 0.9rem; font-weight: 500; letter-spacing: 0.2px;">(Chạm vào thẻ để lật xem nghĩa & nghe phát âm)</p>
+                    </div>
+
+                    <!-- MẶT SAU -->
+                    <div class="flashcard-back">
+                        <div style="font-size: 1.8rem; font-weight: 800; color: #10b981; margin-bottom: 5px;">🇻🇳 ${card.meaning}</div>
+                        ${phoneticsHtml}
+                        
+                        <div style="width: 100%; max-height: 180px; overflow-y: auto; text-align: left; background: #f8fafc; padding: 15px; border-radius: 12px; margin-bottom: 10px; border: 1px solid #f1f5f9;">
+                            ${card.example ? `
+                                <div style="margin-bottom: 8px;">
+                                    <span style="font-weight: 600; color: #1e293b;">🇬🇧 ${card.example}</span> 
+                                    <span style="cursor: pointer; color: #4f46e5; margin-left: 4px;" onclick="event.stopPropagation(); speakText('en', '${escapeJS(card.example)}')">🔊</span>
+                                </div>
+                            ` : ''}
+                            ${card.example_zh ? `
+                                <div style="margin-bottom: 8px;">
+                                    <span style="font-weight: 600; color: #1e293b;">🇨🇳 ${card.example_zh}</span> 
+                                    <span style="cursor: pointer; color: #4f46e5; margin-left: 4px;" onclick="event.stopPropagation(); speakText('zh', '${escapeJS(card.example_zh)}')">🔊</span>
+                                </div>
+                            ` : ''}
+                            ${card.example_vi ? `<div style="color: #64748b; font-size: 0.95rem; border-top: 1px solid #e2e8f0; padding-top: 8px; margin-top: 4px;">🇻🇳 ${card.example_vi}</div>` : ''}
+                        </div>
+                        
+                        <div style="display: flex; gap: 10px; width: 100%; margin-bottom: 10px;">
+                            ${card.word_en ? `<button class="audio-btn" style="flex:1; margin-top:0; border: 1px solid rgba(79, 70, 229, 0.2); background: rgba(79, 70, 229, 0.05); font-weight: 600;" onclick="event.stopPropagation(); speakText('en', '${escapeJS(card.word_en)}')">🔊 Tiếng Anh</button>` : ''}
+                            ${card.word_zh ? `<button class="audio-btn" style="flex:1; margin-top:0; border: 1px solid rgba(217, 70, 239, 0.2); background: rgba(217, 70, 239, 0.05); font-weight: 600;" onclick="event.stopPropagation(); speakText('zh', '${escapeJS(card.word_zh)}')">🔊 Tiếng Trung</button>` : ''}
+                            ${!card.word_en && !card.word_zh ? `<button class="audio-btn" style="flex:1; margin-top:0; border: 1px solid rgba(99, 102, 241, 0.2); background: rgba(99, 102, 241, 0.05); font-weight: 600;" onclick="event.stopPropagation(); speakText('${langCode}', '${escapeJS(card.word)}')">🔊 Đọc từ</button>` : ''}
+                        </div>
+                        
+                        <div class="rating-buttons" onclick="event.stopPropagation();" style="margin-top: auto; width: 100%;">
+                            <button class="rating-btn hard" onclick="rateCard(0)" style="flex: 1;">😫 Khó</button>
+                            <button class="rating-btn medium" onclick="rateCard(1)" style="flex: 1;">😊 Tạm</button>
+                            <button class="rating-btn easy" onclick="rateCard(2)" style="flex: 1;">🎉 Dễ</button>
                         </div>
                     </div>
                 </div>
             </div>
-            <div style="text-align: center; margin-top: 1rem;">${currentCardIndex + 1} / ${dueCards.length}</div>
+            <div style="text-align: center; margin-top: 1.2rem; font-weight: 600; color: #475569; font-size: 1.05rem;">${currentCardIndex + 1} / ${dueCards.length}</div>
         </div>
     `;
     document.getElementById('studyContent').innerHTML = html;
