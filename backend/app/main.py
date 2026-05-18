@@ -252,12 +252,13 @@ def get_today_words(user_id: int = Depends(get_user_id), db: Session = Depends(g
     
     settings = db.query(UserSettings).filter(UserSettings.user_id == user_id).first()
     limit = settings.daily_goal if settings else 5
+    learning_language = settings.learning_language if settings else "en"
     
     learning_list = db.query(UserLearning, Vocabulary, VocabularyGroup)\
         .join(Vocabulary, UserLearning.vocab_id == Vocabulary.id)\
         .join(VocabularyGroup, Vocabulary.group_id == VocabularyGroup.id)\
         .filter(UserLearning.user_id == user_id, UserLearning.next_review <= today)\
-        .filter(Vocabulary.mode == settings.learning_language)\
+        .filter(Vocabulary.mode == learning_language)\
         .limit(limit)\
         .all()
     
@@ -351,7 +352,7 @@ def delete_all_words(user_id: int = Depends(get_user_id), db: Session = Depends(
     """Xoá toàn bộ thẻ của người dùng"""
     db.query(UserLearning).filter(UserLearning.user_id == user_id).delete()
     db.query(Vocabulary).filter(Vocabulary.id.in_(
-        db.query(Vocabulary.id).join(VocabularyGroup).filter(VocabularyGroup.user_id == user_id)
+        db.query(UserLearning.vocab_id).filter(UserLearning.user_id == user_id)
     )).delete(synchronize_session=False)
     db.commit()
     return {"message": "Đã xoá toàn bộ thẻ"}
