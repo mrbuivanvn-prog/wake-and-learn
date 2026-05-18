@@ -84,6 +84,15 @@ async function init() {
         document.getElementById('loginOverlay').classList.add('active');
         return;
     }
+    // Pre-trigger SpeechSynthesis voice caching immediately
+    if (window.speechSynthesis) {
+        window.speechSynthesis.getVoices();
+        if (window.speechSynthesis.onvoiceschanged !== undefined) {
+            window.speechSynthesis.onvoiceschanged = () => {
+                window.speechSynthesis.getVoices();
+            };
+        }
+    }
     try {
         let res = await apiFetch('/auth/me');
         let data = await res.json();
@@ -516,8 +525,40 @@ window.sendChat = async function() {
 }
 
 window.speakText = function(lang, text) {
+    // Ensure speaking doesn't overlap/stutter
+    window.speechSynthesis.cancel();
+    
     let utterance = new SpeechSynthesisUtterance(text);
-    utterance.lang = lang === 'zh' ? 'zh-CN' : 'en-US';
+    
+    // Determine language and voice properly
+    if (lang === 'zh') {
+        utterance.lang = 'zh-CN';
+    } else if (lang === 'en') {
+        utterance.lang = 'en-US';
+    } else {
+        utterance.lang = lang;
+    }
+    
+    // Attempt to load and set high-quality speech voices
+    let voices = window.speechSynthesis.getVoices();
+    let bestVoice = null;
+    
+    if (lang === 'zh') {
+        bestVoice = voices.find(v => v.name.includes('Google 普通话') || v.name.includes('Microsoft Yahei') || v.lang.startsWith('zh-CN'));
+        if (!bestVoice) {
+            bestVoice = voices.find(v => v.lang.startsWith('zh'));
+        }
+    } else if (lang === 'en') {
+        bestVoice = voices.find(v => v.name.includes('Google US English') || v.name.includes('Google UK English') || v.name.includes('Natural') || v.lang.startsWith('en-US') || v.lang.startsWith('en-GB'));
+    }
+    
+    if (bestVoice) {
+        utterance.voice = bestVoice;
+    }
+    
+    utterance.rate = lang === 'zh' ? 0.85 : 0.9; // Slightly slower, optimal for language learning
+    utterance.pitch = 1.05; // Friendly pitch
+    
     window.speechSynthesis.speak(utterance);
 }
 
