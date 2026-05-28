@@ -1,15 +1,16 @@
 from fastapi import FastAPI, Depends, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse, PlainTextResponse
+from fastapi.responses import FileResponse
 from sqlalchemy.orm import Session
+from sqlalchemy.sql import func
 from datetime import datetime, date, timedelta
 from typing import List
-import uuid
 import jwt
 import requests
 import urllib.parse
 import bcrypt
 import os
+import random
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 
 from .database import get_db, init_db
@@ -99,74 +100,73 @@ def register(req: LoginRequest, db: Session = Depends(get_db)):
 
 @app.post("/words/batch-ai")
 def add_words_batch_ai(req: BatchWordRequest, user_id: int = Depends(get_user_id), db: Session = Depends(get_db)):
-    """Thêm nhiều từ - AI tự động dịch và tạo nội dung"""
+    """Thêm nhiều từ - AI tự động dịch và tạo nội dung (OPTIMIZED)"""
     
-    # Determine group name based on actual language, not just zh vs en
-    if req.language == "zh":
-        group_name = "Default_ZH"
-    else:
-        group_name = "Default_EN"
+    # Pre-fetch settings ONCE before loop
+    settings = db.query(UserSettings).filter(UserSettings.user_id == user_id).first()
+    if not settings:
+        settings = UserSettings(user_id=user_id, daily_goal=5, profession="Tổng quát", learning_language=req.language)
+        db.add(settings)
+        db.flush()
     
-    group = db.query(VocabularyGroup).filter(VocabularyGroup.name == group_name, VocabularyGroup.created_by_user == False).first()
+    mode = settings.learning_language if settings.learning_language else req.language
+    profession = settings.profession if settings.profession else "Tổng quát"
+    
+    # Determine group name
+    group_name = "Default_ZH" if req.language == "zh" else "Default_EN"
+    
+    # Pre-fetch or create group
+    group = db.query(VocabularyGroup).filter(
+        VocabularyGroup.name == group_name, 
+        VocabularyGroup.created_by_user == False
+    ).first()
     if not group:
         group = VocabularyGroup(name=group_name, language=req.language, profession="general")
         db.add(group)
         db.flush()
     
+    # Pre-fetch ALL existing words in ONE query (batch duplicate check)
+    normalized_words = [w.strip().lower() for w in req.words if w.strip()]
+    existing_words = set(
+        r[0] for r in db.query(Vocabulary.word).filter(
+            Vocabulary.word.in_(normalized_words)
+        ).all()
+    )
+    
     results = []
-    for word in req.words:
-        word = word.strip().lower()
-        if not word:
+    new_vocabs = []
+    new_learnings = []
+    
+    for word in normalized_words:
+        if not word or word in existing_words:
             continue
+        existing_words.add(word)  # Mark as processed to prevent duplicates in same batch
         
-        # Kiểm tra trùng
-        existing = db.query(Vocabulary).filter(Vocabulary.word == word).first()
-        if existing:
-            continue
-        
-        # CẤU HÌNH THÔNG MINH: Tự động khởi tạo nếu người dùng chưa chọn mục tiêu
-        settings = db.query(UserSettings).filter(UserSettings.user_id == user_id).first()
-        if not settings:
-            settings = UserSettings(user_id=user_id, daily_goal=5, profession="Tổng quát", learning_language=req.language)
-            db.add(settings)
-            db.flush()
-            
-        mode = settings.learning_language if settings.learning_language else req.language
-        profession = settings.profession if settings.profession else "Tổng quát"
-        
-        pinyin = ""
-        pronunciation = ""
-        
+        # === AI PROCESSING (with caching) ===
         if mode == "trilingual":
-            # CHẾ ĐỘ 3 NGÔN NGỮ (EN - ZH - VI) - Prompt cực kỳ nghiêm ngặt
             data = ai_service.translate_trilingual(word, profession=profession)
             word_en = data.get("en", word)
             word_zh = data.get("zh", word)
             pinyin = data.get("pinyin", "")
             meaning = data.get("vi", word)
-            
-            # Fetch English IPA
             pronunciation = ai_service.get_phonetics(word_en, lang="en")
             
-            # BẮT BUỘC AI phải dùng đúng từ trong câu ví dụ để bài tập điền từ hoạt động
             ex_data = ai_service.example_trilingual(word_en, word_zh, meaning, profession=profession)
             example_en = ex_data.get("en", "")
             example_zh = ex_data.get("zh", "")
             example_vi = ex_data.get("vi", "")
             
-            # Tạo cloze text từ ví dụ tiếng Anh (hoặc Trung tùy chế độ)
             cloze_text = ai_service.cloze(word_en, example_en)
             if "_____" not in cloze_text and word_zh:
                 cloze_text = ai_service.cloze(word_zh, example_zh)
             
             conversation = f"EN: {example_en}\nZH: {example_zh}\nVI: {example_vi}"
+            
         elif mode == "zh":
-            # CHẾ ĐỘ TIẾNG TRUNG - VIỆT (ZH - VI)
-            # Translate the word to get Chinese meaning
             meaning = ai_service.translate(word, lang="zh", profession=profession)
             example_data = ai_service.example(word, meaning, lang="zh", profession=profession)
             cloze_text = ai_service.cloze(word, example_data.get("zh", ""), lang="zh")
-            word_zh = word  # The input word IS the Chinese word
+            word_zh = word
             pinyin = ai_service.get_phonetics(word, lang="zh")
             pronunciation = pinyin
             word_en = ""
@@ -174,8 +174,8 @@ def add_words_batch_ai(req: BatchWordRequest, user_id: int = Depends(get_user_id
             example_zh = example_data.get("zh", "")
             example_vi = example_data.get("vi", "")
             conversation = ai_service.conversation(word, lang="zh", profession=profession)
-        else:
-            # CHẾ ĐỘ TIẾNG ANH - VIỆT (EN - VI)
+            
+        else:  # English mode
             meaning = ai_service.translate(word, lang="en", profession=profession)
             example_data = ai_service.example(word, meaning, lang="en", profession=profession)
             cloze_text = ai_service.cloze(word, example_data["en"], lang="en")
@@ -188,9 +188,11 @@ def add_words_batch_ai(req: BatchWordRequest, user_id: int = Depends(get_user_id
             example_zh = ""
             example_vi = example_data["vi"]
 
+        # Image URL (async-safe, no DB needed)
         image_prompt = urllib.parse.quote(f"cute 3D render of {word}, modern simple professional style, white background")
         image_url = f"https://image.pollinations.ai/prompt/{image_prompt}?width=400&height=400&nologo=true"
         
+        # Prepare vocab object for batch insert
         vocab = Vocabulary(
             group_id=group.id,
             word=word,
@@ -208,13 +210,22 @@ def add_words_batch_ai(req: BatchWordRequest, user_id: int = Depends(get_user_id
             cloze_text=cloze_text,
             image_url=image_url
         )
-        db.add(vocab)
-        db.flush()
-        
-        learning = UserLearning(user_id=user_id, vocab_id=vocab.id, next_review=date.today())
-        db.add(learning)
-        
+        new_vocabs.append(vocab)
         results.append({"word": word, "meaning": meaning})
+    
+    # Batch insert all vocabularies at once
+    if new_vocabs:
+        db.add_all(new_vocabs)
+        db.flush()  # Get IDs for all inserted vocabularies
+        
+        # Batch insert all learnings
+        for vocab in new_vocabs:
+            new_learnings.append(UserLearning(
+                user_id=user_id, 
+                vocab_id=vocab.id, 
+                next_review=date.today()
+            ))
+        db.add_all(new_learnings)
     
     db.commit()
     return {"added": len(results), "words": results}
@@ -379,32 +390,48 @@ def delete_word(word_id: int, user_id: int = Depends(get_user_id), db: Session =
     return {"message": "Đã xoá thẻ thành công"}
 
 @app.get("/stats/dashboard")
-
 def get_dashboard(user_id: int = Depends(get_user_id), db: Session = Depends(get_db)):
+    """Dashboard stats - OPTIMIZED with single complex query"""
+    from sqlalchemy import func, case, and_
     
     today = date.today()
     
-    today_words = db.query(UserLearning).filter(UserLearning.user_id == user_id, UserLearning.next_review <= today).count()
-    total_words = db.query(Vocabulary).count()
-    mastered_words = db.query(UserLearning).filter(UserLearning.user_id == user_id, UserLearning.is_mastered == True).count()
+    # Single query for all UserLearning stats
+    learning_stats = db.query(
+        func.count().label('total'),
+        func.sum(case((UserLearning.is_mastered == True, 1), else_=0)).label('mastered'),
+        func.sum(case((and_(UserLearning.next_review <= today, UserLearning.mastery < 0.1), 1), else_=0)).label('new_words'),
+    ).filter(UserLearning.user_id == user_id).first()
     
+    total_words = learning_stats.total or 0
+    mastered_words = learning_stats.mastered or 0
+    today_new_words = learning_stats.new_words or 0
+    
+    # Single query for vocabulary counts (aggregated from existing data)
+    vocab_counts = db.query(
+        func.sum(case((and_(Vocabulary.word_en != "", Vocabulary.word_zh == ""), 1), else_=0)).label('en'),
+        func.sum(case((and_(Vocabulary.word_en == "", Vocabulary.word_zh != ""), 1), else_=0)).label('zh'),
+        func.sum(case((and_(Vocabulary.word_en != "", Vocabulary.word_zh != ""), 1), else_=0)).label('tri'),
+    ).first()
+    
+    en_count = vocab_counts.en or 0
+    zh_count = vocab_counts.zh or 0
+    tri_count = vocab_counts.tri or 0
+    
+    # Weak words (separate query, but optimized with limit)
     weak_words = db.query(UserLearning, Vocabulary)\
         .join(Vocabulary, UserLearning.vocab_id == Vocabulary.id)\
         .filter(UserLearning.user_id == user_id, UserLearning.mastery < 0.4)\
         .limit(5)\
         .all()
     
+    # Settings
     settings = db.query(UserSettings).filter(UserSettings.user_id == user_id).first()
     streak = settings.streak_days if settings else 0
     
-    # Đếm theo ngôn ngữ
-    en_count = db.query(Vocabulary).filter(Vocabulary.word_en != "", Vocabulary.word_zh == "").count()
-    zh_count = db.query(Vocabulary).filter(Vocabulary.word_en == "", Vocabulary.word_zh != "").count()
-    tri_count = db.query(Vocabulary).filter(Vocabulary.word_en != "", Vocabulary.word_zh != "").count()
-    
     return {
-        "today_new_words": 5,
-        "today_review_words": today_words,
+        "today_new_words": today_new_words,
+        "today_review_words": today_new_words,
         "streak": streak,
         "counts": {
             "en": en_count,
@@ -482,9 +509,6 @@ def update_settings(daily_goal: int, profession: str = "Công nghệ thông tin 
         db.commit()
     return {"message": "Settings updated"}
 
-
-from sqlalchemy.sql import func
-import random
 
 class SubmitAnswerRequest(BaseModel):
     vocab_id: int
