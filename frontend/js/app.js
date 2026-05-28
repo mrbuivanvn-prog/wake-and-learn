@@ -3,9 +3,27 @@ let currentUser = null;
 let dueCards = [];
 let currentCardIndex = 0;
 
+// CACHE: Cache manage cards data to avoid repeated API calls
+let _manageCardsCache = null;
+let _manageCardsCacheTime = 0;
+const CACHE_TTL = 30000; // 30 seconds
+
 function escapeJS(str) {
     if (!str) return "";
     return str.toString().replace(/'/g, "\\'").replace(/"/g, "&quot;").replace(/\n/g, " ");
+}
+
+// DEBOUNCE: Utility to debounce function calls
+function debounce(func, wait) {
+    let timeout;
+    return function executedFunction(...args) {
+        const later = () => {
+            clearTimeout(timeout);
+            func(...args);
+        };
+        clearTimeout(timeout);
+        timeout = setTimeout(later, wait);
+    };
 }
 
 async function apiFetch(endpoint, options = {}) {
@@ -99,9 +117,12 @@ async function init() {
         currentUser = data.username;
         document.getElementById('username').innerText = currentUser;
         
-        await loadSettings();
-        await loadStats();
-        await loadStudyCards();
+        // PARALLELIZE: Load settings, stats, and cards concurrently
+        await Promise.all([
+            loadSettings(),
+            loadStats(),
+            loadStudyCards()
+        ]);
         setupTabs();
     } catch (e) {
         logout();
@@ -470,20 +491,39 @@ window.generateBatchCards = async function() {
     showTab('manage');
 }
 
-window.renderManageCards = async function() {
+// CACHED & DEBOUNCED: Use cached data and debounced search
+window.renderManageCards = async function(forceRefresh = false) {
+    const now = Date.now();
+    
+    // Check cache validity
+    const useCache = !forceRefresh && 
+                     _manageCardsCache && 
+                     (now - _manageCardsCacheTime) < CACHE_TTL;
+    
     try {
-        let res = await apiFetch('/words/manage');
-        if (!res.ok) throw new Error("Error");
-        let data = await res.json();
-        let cards = data || [];
+        let cards;
+        
+        if (useCache) {
+            cards = _manageCardsCache;
+        } else {
+            let res = await apiFetch('/words/manage');
+            if (!res.ok) throw new Error("Error");
+            cards = await res.json() || [];
+            // Update cache
+            _manageCardsCache = cards;
+            _manageCardsCacheTime = now;
+        }
+        
         let searchTerm = document.getElementById('manageSearch').value.toLowerCase();
         let container = document.getElementById('manageCardsContainer');
         container.innerHTML = '';
+        
         let filtered = cards.filter(c => 
             c.word.toLowerCase().includes(searchTerm) || 
             (c.word_en && c.word_en.toLowerCase().includes(searchTerm)) ||
             (c.word_zh && c.word_zh.includes(searchTerm))
         );
+        
         filtered.forEach(c => {
             let cardDiv = document.createElement('div');
             cardDiv.className = 'ai-box';
@@ -509,13 +549,19 @@ window.renderManageCards = async function() {
     } catch(e) { console.error(e); }
 }
 
+// Debounced search handler
+window.onManageSearch = debounce(function() {
+    renderManageCards();
+}, 300);
+
 window.deleteCardDirect = async function(id) {
     if (!confirm('Xoá thẻ này?')) return;
     try {
         let res = await apiFetch(`/words/${id}`, { method: 'DELETE' });
         if (res.ok) {
             showToast('✅ Đã xoá');
-            renderManageCards();
+            _manageCardsCache = null;  // Clear cache
+            renderManageCards(true);     // Force refresh
             loadStats();
         }
     } catch(e) {}
@@ -527,7 +573,8 @@ window.deleteAllCards = async function() {
         let res = await apiFetch('/words/all', { method: 'DELETE' });
         if (res.ok) {
             showToast('✅ Đã xoá sạch');
-            renderManageCards();
+            _manageCardsCache = null;  // Clear cache
+            renderManageCards(true);   // Force refresh
             loadStats();
         }
     } catch(e) {}
